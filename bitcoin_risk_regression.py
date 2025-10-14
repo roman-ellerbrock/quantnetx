@@ -269,6 +269,60 @@ def main():
     print(f"    (0=undervalued, 1=top - matching bitcoin_risk package)")
 
     # ========================================================================
+    # Generate extended time range for plotting (2 years into future)
+    # ========================================================================
+    print("\n" + "="*70)
+    print("GENERATING EXTENDED PLOT DATA")
+    print("="*70)
+
+    # Calculate future time range (2 years = 104 weeks for weekly data)
+    last_unix_time = times_unix[-1]
+    two_years_seconds = 2 * 365.25 * 24 * 3600
+    future_unix_time = last_unix_time + two_years_seconds
+
+    # Start from 2010-01-01 (unix timestamp: 1262304000)
+    start_unix_time = 1262304000  # 2010-01-01 00:00:00 UTC
+
+    # Create extended time array from 2010 to 2 years ahead
+    # Using weekly intervals (604800 seconds = 1 week)
+    week_seconds = 7 * 24 * 3600
+    num_future_weeks = int((future_unix_time - start_unix_time) / week_seconds) + 1
+    extended_unix_times = np.linspace(start_unix_time, future_unix_time, num_future_weeks)
+    extended_btc_times = _unix_to_btc_time(extended_unix_times)
+
+    print(f"Extended time range:")
+    print(f"  Start: {start_unix_time} (unix, 2010-01-01)")
+    print(f"  End:   {future_unix_time:.0f} (unix, +2 years)")
+    print(f"  Total points for plotting: {len(extended_unix_times)}")
+
+    # Generate fitted curves for extended time range
+    extended_fitted_mean = log_regression_model(extended_btc_times, a_mean, b_mean)
+    extended_fitted_over = log_regression_model(extended_btc_times, a_over, b_over)
+    extended_fitted_under = log_regression_model(extended_btc_times, a_under, b_under)
+    extended_fitted_extreme_over = log_regression_model(extended_btc_times, a_extreme_over, b_extreme_over)
+    extended_fitted_extreme_under = log_regression_model(extended_btc_times, a_extreme_under, b_extreme_under)
+    extended_fitted_top = log_regression_model(extended_btc_times, a_top, b_top)
+
+    # For actual prices, we need to pad with NaN for future values
+    extended_prices = np.full(len(extended_unix_times), np.nan)
+    # Find where actual data points match in the extended array
+    for i, t in enumerate(times_unix):
+        idx = np.argmin(np.abs(extended_unix_times - t))
+        extended_prices[idx] = prices[i]
+
+    # Calculate risk metric for the available data range
+    v0_extended = np.log(extended_fitted_under)
+    v1_extended = np.log(extended_fitted_top)
+
+    # Risk only where we have actual prices
+    extended_risk_normalized = np.full(len(extended_unix_times), np.nan)
+    mask_with_prices = ~np.isnan(extended_prices)
+    extended_risk_normalized[mask_with_prices] = (
+        (np.log(extended_prices[mask_with_prices]) - v0_extended[mask_with_prices]) /
+        (v1_extended[mask_with_prices] - v0_extended[mask_with_prices])
+    )
+
+    # ========================================================================
     # Save results to JSON for HTML visualization
     # ========================================================================
     results = {
@@ -302,22 +356,23 @@ def main():
             'log_std': float(log_std)
         },
         'data': {
-            'times': times_unix_filtered.tolist(),  # Save unix times for HTML
-            'prices': prices_filtered.tolist(),
-            'fitted_mean': fitted_mean.tolist(),
-            'fitted_overvalued': fitted_overvalued.tolist(),
-            'fitted_undervalued': fitted_undervalued.tolist(),
-            'fitted_extreme_overvalued': fitted_extreme_over.tolist(),
-            'fitted_extreme_undervalued': fitted_extreme_under.tolist(),
-            'fitted_top': fitted_top.tolist(),
-            'risk_normalized': risk_normalized.tolist(),
+            # Extended data for plotting (includes 2 years future projection)
+            'times': extended_unix_times.tolist(),
+            'prices': extended_prices.tolist(),
+            'fitted_mean': extended_fitted_mean.tolist(),
+            'fitted_overvalued': extended_fitted_over.tolist(),
+            'fitted_undervalued': extended_fitted_under.tolist(),
+            'fitted_extreme_overvalued': extended_fitted_extreme_over.tolist(),
+            'fitted_extreme_undervalued': extended_fitted_extreme_under.tolist(),
+            'fitted_top': extended_fitted_top.tolist(),
+            'risk_normalized': extended_risk_normalized.tolist(),
             # Keep sigma bands based on mean fit
-            'upper_1sigma': (fitted_mean * np.exp(log_std)).tolist(),
-            'lower_1sigma': (fitted_mean * np.exp(-log_std)).tolist(),
-            'upper_2sigma': (fitted_mean * np.exp(2 * log_std)).tolist(),
-            'lower_2sigma': (fitted_mean * np.exp(-2 * log_std)).tolist(),
-            'upper_3sigma': (fitted_mean * np.exp(3 * log_std)).tolist(),
-            'lower_3sigma': (fitted_mean * np.exp(-3 * log_std)).tolist(),
+            'upper_1sigma': (extended_fitted_mean * np.exp(log_std)).tolist(),
+            'lower_1sigma': (extended_fitted_mean * np.exp(-log_std)).tolist(),
+            'upper_2sigma': (extended_fitted_mean * np.exp(2 * log_std)).tolist(),
+            'lower_2sigma': (extended_fitted_mean * np.exp(-2 * log_std)).tolist(),
+            'upper_3sigma': (extended_fitted_mean * np.exp(3 * log_std)).tolist(),
+            'lower_3sigma': (extended_fitted_mean * np.exp(-3 * log_std)).tolist(),
         },
         'current': {
             'price': float(current_price),
@@ -333,8 +388,21 @@ def main():
         }
     }
 
+    # Convert NaN to None (null in JSON) before saving
+    def convert_nan_to_none(obj):
+        if isinstance(obj, dict):
+            return {k: convert_nan_to_none(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_nan_to_none(item) for item in obj]
+        elif isinstance(obj, float) and np.isnan(obj):
+            return None
+        else:
+            return obj
+
+    results_clean = convert_nan_to_none(results)
+
     with open('bitcoin_risk_data.json', 'w') as f:
-        json.dump(results, f, indent=2)
+        json.dump(results_clean, f, indent=2)
 
     print("\nResults saved to bitcoin_risk_data.json")
 

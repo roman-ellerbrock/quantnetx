@@ -48,13 +48,14 @@
 
         <div id="loading" class="loading">Loading data...</div>
 
-        <div class="chart-container" id="chartContainer" style="display: none;">
-            <div id="riskChart"></div>
-        </div>
+    </div>
 
-        <div class="chart-container" id="normalizedRiskChartContainer" style="display: none;">
-            <div id="normalizedRiskChart"></div>
-        </div>
+    <div class="chart-container" id="chartContainer" style="display: none; max-width: none; width: 95vw; margin-left: auto; margin-right: auto;">
+        <div id="riskChart" style="width: 100%; height: 700px;"></div>
+    </div>
+
+    <div class="chart-container" id="normalizedRiskChartContainer" style="display: none; max-width: none; width: 95vw; margin-left: auto; margin-right: auto;">
+        <div id="normalizedRiskChart" style="width: 100%; height: 700px;"></div>
     </div>
 
     <script>
@@ -208,6 +209,7 @@
             const fitted_undervalued = data.data.fitted_undervalued;
             const fitted_extreme_over = data.data.fitted_extreme_overvalued;
             const fitted_extreme_under = data.data.fitted_extreme_undervalued;
+            const risk_normalized = data.data.risk_normalized;
 
             // Convert unix times to dates
             const dates = times.map(t => new Date(t * 1000));
@@ -221,7 +223,7 @@
                 name: 'Extreme Overvalued',
                 type: 'scatter',
                 mode: 'lines',
-                line: { color: '#b71c1c', width: 2.5 },
+                line: { color: 'rgba(183, 28, 28, 0.4)', width: 1.5 },
 //                fill: 'tonexty',
 //                fillcolor: 'rgba(183, 28, 28, 0.1)'
             });
@@ -233,9 +235,9 @@
                 name: 'Overvalued Model',
                 type: 'scatter',
                 mode: 'lines',
-                line: { color: '#f44336', width: 2.5 },
+                line: { color: 'rgba(244, 67, 54, 0.4)', width: 1.5 },
                 fill: 'tonexty',
-                fillcolor: 'rgba(244, 67, 54, 0.15)'
+                fillcolor: 'rgba(244, 67, 54, 0.05)'
             });
 
             // Mean fitted regression line (yellow - middle of rainbow)
@@ -245,43 +247,90 @@
                 name: 'Mean Price Model',
                 type: 'scatter',
                 mode: 'lines',
-                line: { color: '#ffc107', width: 3 },
+                line: { color: 'rgba(255, 193, 7, 0.5)', width: 2 },
                 fill: 'tonexty',
-                fillcolor: 'rgba(255, 193, 7, 0.15)'
+                fillcolor: 'rgba(255, 193, 7, 0.05)'
             });
 
-            // Undervalued fitted regression line (light green)
+            // Undervalued fitted regression line (medium blue)
             traces.push({
                 x: dates,
                 y: fitted_undervalued,
                 name: 'Undervalued Model',
                 type: 'scatter',
                 mode: 'lines',
-                line: { color: '#8bc34a', width: 2.5 },
+                line: { color: 'rgba(33, 150, 243, 0.4)', width: 1.5 },
                 fill: 'tonexty',
-                fillcolor: 'rgba(139, 195, 74, 0.15)'
+                fillcolor: 'rgba(33, 150, 243, 0.05)'
             });
 
-            // Extreme undervalued boundary (dark green - bottom of rainbow)
+            // Extreme undervalued boundary (dark blue - bottom of rainbow)
             traces.push({
                 x: dates,
                 y: fitted_extreme_under,
                 name: 'Extreme Undervalued',
                 type: 'scatter',
                 mode: 'lines',
-                line: { color: '#2e7d32', width: 2.5 },
+                line: { color: 'rgba(13, 71, 161, 0.4)', width: 1.5 },
                 fill: 'tonexty',
-                fillcolor: 'rgba(46, 125, 50, 0.1)'
+                fillcolor: 'rgba(13, 71, 161, 0.03)'
             });
 
-            // Actual Bitcoin price
+            // Actual Bitcoin price - colored by risk metric
+            // Filter out null values for the price trace
+            const validIndices = [];
+            const validDates = [];
+            const validPrices = [];
+            const validRisk = [];
+
+            for (let i = 0; i < prices.length; i++) {
+                if (prices[i] !== null && risk_normalized[i] !== null) {
+                    validIndices.push(i);
+                    validDates.push(dates[i]);
+                    validPrices.push(prices[i]);
+                    validRisk.push(risk_normalized[i]);
+                }
+            }
+
             traces.push({
-                x: dates,
-                y: prices,
+                x: validDates,
+                y: validPrices,
                 name: 'Bitcoin Price',
                 type: 'scatter',
-                mode: 'lines',
-                line: { color: '#ffffff', width: 3 }
+                mode: 'markers+lines',
+                marker: {
+                    size: 4,
+                    color: validRisk,
+                    colorscale: [
+                        [0, '#0d47a1'],     // Deep blue - low risk (undervalued)
+                        [0.25, '#2196f3'],  // Blue
+                        [0.5, '#ffc107'],   // Yellow - medium risk
+                        [0.75, '#ff9800'],  // Orange
+                        [1, '#b71c1c']      // Deep red - high risk (overvalued)
+                    ],
+                    colorbar: {
+                        title: 'Risk',
+                        titleside: 'right',
+                        tickmode: 'linear',
+                        tick0: 0,
+                        dtick: 0.25,
+                        thickness: 15,
+                        len: 0.7,
+                        x: 1.02,
+                        bgcolor: 'rgba(0, 0, 0, 0.5)',
+                        bordercolor: 'rgba(255, 255, 255, 0.2)',
+                        borderwidth: 1,
+                        tickfont: { color: '#e4e4e4' },
+                        titlefont: { color: '#e4e4e4' }
+                    },
+                    cmin: 0,
+                    cmax: 1,
+                    showscale: true
+                },
+                line: {
+                    width: 2,
+                    color: 'rgba(255, 255, 255, 0.3)'
+                }
             });
 
             const layout = {
@@ -327,8 +376,16 @@
                 displaylogo: false
             };
 
-            Plotly.newPlot('riskChart', traces, layout, config);
+            // WICHTIG: Container ZUERST sichtbar machen
             document.getElementById('chartContainer').style.display = 'block';
+
+            // Dann Chart erstellen
+            Plotly.newPlot('riskChart', traces, layout, config);
+
+            // Und Resize erzwingen
+            setTimeout(() => {
+                Plotly.Plots.resize('riskChart');
+            }, 100);
         }
 
         function plotNormalizedRisk(data) {
@@ -342,44 +399,81 @@
 
             // Calculate boundary risk traces (undervalued=0, top=1)
             const undervalued_risk = [];
+            const mean_risk = [];
             const top_risk = [];
             for (let i = 0; i < prices.length; i++) {
                 undervalued_risk.push(0.0);  // Undervalued = 0
+                mean_risk.push(0.5);  // Mean = 0.5
                 top_risk.push(1.0);  // Top = 1
             }
 
             const traces = [];
 
-            // Undervalued boundary line (0)
+            // Undervalued boundary line (0) - dark blue
             traces.push({
                 x: dates,
                 y: undervalued_risk,
                 type: 'scatter',
                 mode: 'lines',
                 name: 'Undervalued (0)',
-                line: { color: '#8bc34a', width: 2 }
+                line: { color: 'rgba(13, 71, 161, 0.6)', width: 1.5 }
             });
 
-            // Top boundary line (1)
+            // Top boundary line (1) - dark red
             traces.push({
                 x: dates,
                 y: top_risk,
                 type: 'scatter',
                 mode: 'lines',
                 name: 'Top (1)',
-                line: { color: '#b71c1c', width: 2 }
+                line: { color: 'rgba(183, 28, 28, 0.6)', width: 1.5 }
             });
 
-            // Normalized risk line
+            // Mean line (0.5) - yellow
             traces.push({
                 x: dates,
-                y: risk_normalized,
+                y: mean_risk,
                 type: 'scatter',
                 mode: 'lines',
+                name: 'Mean (0.5)',
+                line: { color: 'rgba(255, 193, 7, 0.5)', width: 1.5 }
+            });
+
+            // Filter out null values for the risk trace and color it
+            const validDates = [];
+            const validRisk = [];
+
+            for (let i = 0; i < risk_normalized.length; i++) {
+                if (risk_normalized[i] !== null) {
+                    validDates.push(dates[i]);
+                    validRisk.push(risk_normalized[i]);
+                }
+            }
+
+            // Normalized risk line - colored by risk value
+            traces.push({
+                x: validDates,
+                y: validRisk,
+                type: 'scatter',
+                mode: 'markers+lines',
                 name: 'Risk Metric',
+                marker: {
+                    size: 4,
+                    color: validRisk,
+                    colorscale: [
+                        [0, '#0d47a1'],     // Deep blue - low risk (undervalued)
+                        [0.25, '#2196f3'],  // Blue
+                        [0.5, '#ffc107'],   // Yellow - medium risk
+                        [0.75, '#ff9800'],  // Orange
+                        [1, '#b71c1c']      // Deep red - high risk (overvalued)
+                    ],
+                    cmin: 0,
+                    cmax: 1,
+                    showscale: false  // Don't show colorbar since it's in the first chart
+                },
                 line: {
-                    color: '#ffffff',
-                    width: 3
+                    width: 2,
+                    color: 'rgba(255, 255, 255, 0.3)'
                 }
             });
 
@@ -398,7 +492,7 @@
                     color: '#a0a0a0',
                     gridcolor: 'rgba(255, 255, 255, 0.1)'
                 },
-                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                plot_bgcolor: 'rgba(1, 0, 0, 0.2)',
                 paper_bgcolor: 'rgba(0, 0, 0, 0)',
                 font: { color: '#e4e4e4' },
                 hovermode: 'x unified',
@@ -424,8 +518,16 @@
                 displaylogo: false
             };
 
-            Plotly.newPlot('normalizedRiskChart', traces, layout, config);
+            // WICHTIG: Container ZUERST sichtbar machen
             document.getElementById('normalizedRiskChartContainer').style.display = 'block';
+
+            // Dann Chart erstellen
+            Plotly.newPlot('normalizedRiskChart', traces, layout, config);
+
+            // Und Resize erzwingen
+            setTimeout(() => {
+                Plotly.Plots.resize('normalizedRiskChart');
+            }, 100);
         }
 
         // ============================================================================
@@ -466,6 +568,16 @@
 
         // Start the application
         initialize();
+
+        // Window Resize Handler - resize charts when window is resized
+        window.addEventListener('resize', () => {
+            if (document.getElementById('chartContainer').style.display !== 'none') {
+                Plotly.Plots.resize('riskChart');
+            }
+            if (document.getElementById('normalizedRiskChartContainer').style.display !== 'none') {
+                Plotly.Plots.resize('normalizedRiskChart');
+            }
+        });
     </script>
 </body>
 </html>

@@ -727,8 +727,16 @@
                 displaylogo: false
             };
 
-            Plotly.newPlot('probabilityChart', traces, layout, config);
+            // WICHTIG: Container ZUERST sichtbar machen
             document.getElementById('chartContainer').style.display = 'block';
+
+            // Dann Chart erstellen
+            Plotly.newPlot('probabilityChart', traces, layout, config);
+
+            // Und Resize erzwingen
+            setTimeout(() => {
+                Plotly.Plots.resize('probabilityChart');
+            }, 100);
         }
 
         // Plot cumulative distribution
@@ -821,8 +829,16 @@
                 displaylogo: false
             };
 
-            Plotly.newPlot('cumulativeChart', traces, layout, config);
+            // WICHTIG: Container ZUERST sichtbar machen
             document.getElementById('cumulativeChartContainer').style.display = 'block';
+
+            // Dann Chart erstellen
+            Plotly.newPlot('cumulativeChart', traces, layout, config);
+
+            // Und Resize erzwingen
+            setTimeout(() => {
+                Plotly.Plots.resize('cumulativeChart');
+            }, 100);
         }
 
         // Plot mark prices, first derivative, or second derivative
@@ -994,8 +1010,16 @@
                 displaylogo: false
             };
 
-            Plotly.newPlot('markPriceChart', traces, layout, config);
+            // WICHTIG: Container ZUERST sichtbar machen
             document.getElementById('markPriceChartContainer').style.display = 'block';
+
+            // Dann Chart erstellen
+            Plotly.newPlot('markPriceChart', traces, layout, config);
+
+            // Und Resize erzwingen
+            setTimeout(() => {
+                Plotly.Plots.resize('markPriceChart');
+            }, 100);
         }
 
         // ============================================================================
@@ -1147,6 +1171,19 @@
         // Initialize on page load
         updateMethodDescription();
         loadExpiries();
+
+        // Window Resize Handler - resize charts when window is resized
+        window.addEventListener('resize', () => {
+            if (document.getElementById('chartContainer').style.display !== 'none') {
+                Plotly.Plots.resize('probabilityChart');
+            }
+            if (document.getElementById('cumulativeChartContainer').style.display !== 'none') {
+                Plotly.Plots.resize('cumulativeChart');
+            }
+            if (document.getElementById('markPriceChartContainer').style.display !== 'none') {
+                Plotly.Plots.resize('markPriceChart');
+            }
+        });
     </script>
 </body>
 </html>
