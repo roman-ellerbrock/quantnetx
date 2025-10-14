@@ -2,6 +2,8 @@
 
 Financial analytics platform for cryptocurrency risk analysis and options pricing.
 
+🌐 **Live Demo:** [https://roman-ellerbrock.github.io/quantnetx/](https://roman-ellerbrock.github.io/quantnetx/)
+
 ## Project Structure
 
 ```
@@ -15,26 +17,29 @@ quantnetx/
 
 ## Quick Start
 
-### Installation
+### View Online
+
+Visit [https://roman-ellerbrock.github.io/quantnetx/](https://roman-ellerbrock.github.io/quantnetx/)
+
+- **Options Analysis:** [/static/index.html](https://roman-ellerbrock.github.io/quantnetx/static/index.html)
+- **Bitcoin Risk Metric:** [/static/bitcoin_risk.html](https://roman-ellerbrock.github.io/quantnetx/static/bitcoin_risk.html)
+
+### Local Development
 
 ```bash
 # Install dependencies
 pixi install
-```
 
-### Usage
-
-**View the web interface:**
-```bash
-# Serve locally (recommended)
+# Serve locally
 python -m http.server 8000
 
 # Then open:
-# http://localhost:8000/static/index.html        # Options analysis
-# http://localhost:8000/static/bitcoin_risk.html # Bitcoin risk metrics
+# http://localhost:8000/static/index.html
+# http://localhost:8000/static/bitcoin_risk.html
 ```
 
-**Update Bitcoin data:**
+### Update Bitcoin Data
+
 ```bash
 ./scripts/refresh_charts.sh
 ```
