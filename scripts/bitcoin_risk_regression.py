@@ -87,7 +87,7 @@ def perform_log_regression(btc_times, prices, label=""):
 
 def main():
     # Load data
-    csv_path = 'BTCUSD_1W.csv'
+    csv_path = 'data/BTCUSD_1W.csv'
     times_btc, prices, times_unix = load_bitcoin_data(csv_path)
 
     print(f"Loaded {len(times_btc)} data points")
@@ -401,10 +401,10 @@ def main():
 
     results_clean = convert_nan_to_none(results)
 
-    with open('bitcoin_risk_data.json', 'w') as f:
+    with open('data/bitcoin_risk_data.json', 'w') as f:
         json.dump(results_clean, f, indent=2)
 
-    print("\nResults saved to bitcoin_risk_data.json")
+    print("\nResults saved to data/bitcoin_risk_data.json")
 
 if __name__ == '__main__':
     main()

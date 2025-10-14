@@ -9,7 +9,7 @@ import requests
 import time
 from datetime import datetime, timezone
 
-CSV_FILE = 'BTCUSD_1W.csv'
+CSV_FILE = 'data/BTCUSD_1W.csv'
 WEEK_SECONDS = 7 * 24 * 3600  # 1 week in seconds
 
 def fetch_binance_klines(start_time, end_time=None):
@@ -138,7 +138,7 @@ def main():
 
     if success:
         print("\n" + "="*70)
-        print("Update complete! Run bitcoin_risk_regression.py to regenerate charts.")
+        print("Update complete! Run scripts/bitcoin_risk_regression.py to regenerate charts.")
         print("="*70)
     else:
         print("\nUpdate failed!")
