@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantNetX - Bitcoin Risk Metric</title>
+    <link rel="icon" type="image/png" href="quantnetx_minilogo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-title">
+                <img src="quantnetx_minilogo.png" alt="QuantNetX" class="minilogo">
+                <h1>QuantNetX</h1>
+            </div>
+            <p class="subtitle">Bitcoin Risk Metric - Logarithmic Regression Model</p>
+        </header>
+
+        <nav class="nav-bar">
+            <a href="index.html" class="nav-link">Options Analysis</a>
+            <a href="bitcoin_risk.html" class="nav-link active">Bitcoin Risk Metric</a>
+        </nav>
+
+        <div class="info-box" id="methodInfo">
+            <strong>Method:</strong> This risk metric uses logarithmic polynomial regression to model Bitcoin price growth.
+            The model assumes polylogarithmic growth: log(P(t)) = a·log(t-t₀) + b, where t₀ = 1.2625632×10⁹ (Unix time).
+            The colored bands represent standard deviations in log space, indicating overvaluation (above) and undervaluation (below) regions.
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="scaleSelect">Price Scale</label>
+                <select id="scaleSelect">
+                    <option value="log">Logarithmic</option>
+                    <option value="linear">Linear</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <button id="refreshBtn">Refresh Data</button>
+            </div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="stats" class="stats-grid" style="display: none;"></div>
+
+        <div id="loading" class="loading">Loading data...</div>
+
+        <div class="chart-container" id="chartContainer" style="display: none;">
+            <div id="riskChart"></div>
+        </div>
+
+        <div class="chart-container" id="normalizedRiskChartContainer" style="display: none;">
+            <div id="normalizedRiskChart"></div>
+        </div>
+    </div>
+
+    <script>
+        let riskData = null;
+
+        // ============================================================================
+        // Utility Functions
+        // ============================================================================
+
+        function formatNumber(num, decimals = 2) {
+            if (!num || num === '') return '-';
+            const n = parseFloat(num);
+            if (isNaN(n)) return '-';
+            return n.toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        function formatDate(unixTime) {
+            const date = new Date(unixTime * 1000);
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        // ============================================================================
+        // Data Loading
+        // ============================================================================
+
+        async function loadRiskData() {
+            try {
+                const response = await fetch('bitcoin_risk_data.json');
+                if (!response.ok) {
+                    throw new Error('Failed to load risk data');
+                }
+                riskData = await response.json();
+                return riskData;
+            } catch (error) {
+                showError('Error loading risk data: ' + error.message);
+                return null;
+            }
+        }
+
+        // ============================================================================
+        // Statistics Display
+        // ============================================================================
+
+        function updateStats(data) {
+            const statsDiv = document.getElementById('stats');
+            const params = data.parameters;
+            const current = data.current;
+
+            // Determine risk level and color based on normalized risk
+            let riskLevel = 'Neutral';
+            let riskColor = '#ffc107';
+            const risk_norm = current.risk_metric_normalized;
+            const risk_sigma = current.risk_metric_sigma;
+
+            if (risk_norm > 1.5) {
+                riskLevel = 'Extreme Overvaluation';
+                riskColor = '#b71c1c';
+            } else if (risk_norm > 1.2) {
+                riskLevel = 'Highly Overvalued';
+                riskColor = '#f44336';
+            } else if (risk_norm > 0.8) {
+                riskLevel = 'Overvalued';
+                riskColor = '#ff9800';
+            } else if (risk_norm > 0.5) {
+                riskLevel = 'Slightly Overvalued';
+                riskColor = '#ffc107';
+            } else if (risk_norm < -0.5) {
+                riskLevel = 'Extreme Undervaluation';
+                riskColor = '#1b5e20';
+            } else if (risk_norm < -0.2) {
+                riskLevel = 'Highly Undervalued';
+                riskColor = '#2e7d32';
+            } else if (risk_norm < 0.2) {
+                riskLevel = 'Undervalued';
+                riskColor = '#4caf50';
+            } else if (risk_norm < 0.5) {
+                riskLevel = 'Slightly Undervalued';
+                riskColor = '#8bc34a';
+            }
+
+            const html = `
+                <div class="stat-card">
+                    <div class="stat-label">Current Price</div>
+                    <div class="stat-value">$${formatNumber(current.price, 2)}</div>
+                </div>
+                <div class="stat-card" style="border-left: 3px solid ${riskColor};">
+                    <div class="stat-label">Risk Metric</div>
+                    <div class="stat-value">${risk_norm.toFixed(2)}</div>
+                </div>
+                <div class="stat-card" style="border-left: 3px solid ${riskColor};">
+                    <div class="stat-label">Valuation</div>
+                    <div class="stat-value" style="color: ${riskColor};">${riskLevel}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Mean Price</div>
+                    <div class="stat-value">$${formatNumber(current.fitted_mean, 2)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Overvalued Price</div>
+                    <div class="stat-value">$${formatNumber(current.fitted_overvalued, 2)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Undervalued Price</div>
+                    <div class="stat-value">$${formatNumber(current.fitted_undervalued, 2)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Extreme Overvalued</div>
+                    <div class="stat-value">$${formatNumber(current.fitted_extreme_overvalued, 2)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Extreme Undervalued</div>
+                    <div class="stat-value">$${formatNumber(current.fitted_extreme_undervalued, 2)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Risk (σ)</div>
+                    <div class="stat-value">${risk_sigma.toFixed(2)}σ</div>
+                </div>
+            `;
+
+            statsDiv.innerHTML = html;
+            statsDiv.style.display = 'grid';
+        }
+
+        // ============================================================================
+        // Plotting Functions
+        // ============================================================================
+
+        function plotRiskMetric(data) {
+            const scaleType = document.getElementById('scaleSelect').value;
+            const times = data.data.times;
+            const prices = data.data.prices;
+            const fitted_mean = data.data.fitted_mean;
+            const fitted_overvalued = data.data.fitted_overvalued;
+            const fitted_undervalued = data.data.fitted_undervalued;
+            const fitted_extreme_over = data.data.fitted_extreme_overvalued;
+            const fitted_extreme_under = data.data.fitted_extreme_undervalued;
+
+            // Convert unix times to dates
+            const dates = times.map(t => new Date(t * 1000));
+
+            const traces = [];
+
+            // Extreme overvalued boundary (dark red - top of rainbow)
+            traces.push({
+                x: dates,
+                y: fitted_extreme_over,
+                name: 'Extreme Overvalued',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#b71c1c', width: 2.5 },
+//                fill: 'tonexty',
+//                fillcolor: 'rgba(183, 28, 28, 0.1)'
+            });
+
+            // Overvalued fitted regression line (red)
+            traces.push({
+                x: dates,
+                y: fitted_overvalued,
+                name: 'Overvalued Model',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#f44336', width: 2.5 },
+                fill: 'tonexty',
+                fillcolor: 'rgba(244, 67, 54, 0.15)'
+            });
+
+            // Mean fitted regression line (yellow - middle of rainbow)
+            traces.push({
+                x: dates,
+                y: fitted_mean,
+                name: 'Mean Price Model',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#ffc107', width: 3 },
+                fill: 'tonexty',
+                fillcolor: 'rgba(255, 193, 7, 0.15)'
+            });
+
+            // Undervalued fitted regression line (light green)
+            traces.push({
+                x: dates,
+                y: fitted_undervalued,
+                name: 'Undervalued Model',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#8bc34a', width: 2.5 },
+                fill: 'tonexty',
+                fillcolor: 'rgba(139, 195, 74, 0.15)'
+            });
+
+            // Extreme undervalued boundary (dark green - bottom of rainbow)
+            traces.push({
+                x: dates,
+                y: fitted_extreme_under,
+                name: 'Extreme Undervalued',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#2e7d32', width: 2.5 },
+                fill: 'tonexty',
+                fillcolor: 'rgba(46, 125, 50, 0.1)'
+            });
+
+            // Actual Bitcoin price
+            traces.push({
+                x: dates,
+                y: prices,
+                name: 'Bitcoin Price',
+                type: 'scatter',
+                mode: 'lines',
+                line: { color: '#ffffff', width: 3 }
+            });
+
+            const layout = {
+                title: {
+                    text: 'Bitcoin Price with Logarithmic Regression Risk Bands',
+                    font: { color: '#e4e4e4', size: 20 }
+                },
+                xaxis: {
+                    title: 'Date',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)'
+                },
+                yaxis: {
+                    title: 'Price (USD)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    type: scaleType,
+                    tickformat: scaleType === 'log' ? '.0f' : '$,.0f'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: -0.2,
+                    yanchor: 'top',
+                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    bordercolor: 'rgba(255, 255, 255, 0.2)',
+                    borderwidth: 1
+                },
+                margin: {
+                    b: 120
+                }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('riskChart', traces, layout, config);
+            document.getElementById('chartContainer').style.display = 'block';
+        }
+
+        function plotNormalizedRisk(data) {
+            const times = data.data.times;
+            const risk_normalized = data.data.risk_normalized;
+            const prices = data.data.prices;
+            const fitted_undervalued = data.data.fitted_undervalued;
+            const fitted_top = data.data.fitted_top;
+
+            const dates = times.map(t => new Date(t * 1000));
+
+            // Calculate boundary risk traces (undervalued=0, top=1)
+            const undervalued_risk = [];
+            const top_risk = [];
+            for (let i = 0; i < prices.length; i++) {
+                undervalued_risk.push(0.0);  // Undervalued = 0
+                top_risk.push(1.0);  // Top = 1
+            }
+
+            const traces = [];
+
+            // Undervalued boundary line (0)
+            traces.push({
+                x: dates,
+                y: undervalued_risk,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Undervalued (0)',
+                line: { color: '#8bc34a', width: 2 }
+            });
+
+            // Top boundary line (1)
+            traces.push({
+                x: dates,
+                y: top_risk,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Top (1)',
+                line: { color: '#b71c1c', width: 2 }
+            });
+
+            // Normalized risk line
+            traces.push({
+                x: dates,
+                y: risk_normalized,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'Risk Metric',
+                line: {
+                    color: '#ffffff',
+                    width: 3
+                }
+            });
+
+            const layout = {
+                title: {
+                    text: 'Bitcoin Risk Metric Over Time (Extreme Boundaries)',
+                    font: { color: '#e4e4e4', size: 20 }
+                },
+                xaxis: {
+                    title: 'Date',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)'
+                },
+                yaxis: {
+                    title: 'Risk Metric (0 = Extreme Undervalued, 1 = Extreme Overvalued)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: -0.2,
+                    yanchor: 'top',
+                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    bordercolor: 'rgba(255, 255, 255, 0.2)',
+                    borderwidth: 1
+                },
+                margin: {
+                    b: 100
+                }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('normalizedRiskChart', traces, layout, config);
+            document.getElementById('normalizedRiskChartContainer').style.display = 'block';
+        }
+
+        // ============================================================================
+        // Event Handlers
+        // ============================================================================
+
+        document.getElementById('scaleSelect').addEventListener('change', () => {
+            if (riskData) {
+                plotRiskMetric(riskData);
+            }
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('chartContainer').style.display = 'none';
+            document.getElementById('normalizedRiskChartContainer').style.display = 'none';
+            document.getElementById('stats').style.display = 'none';
+            hideError();
+
+            await initialize();
+        });
+
+        // ============================================================================
+        // Initialization
+        // ============================================================================
+
+        async function initialize() {
+            const data = await loadRiskData();
+
+            if (data) {
+                updateStats(data);
+                plotRiskMetric(data);
+                plotNormalizedRisk(data);
+            }
+
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Start the application
+        initialize();
+    </script>
+</body>
+</html>
