@@ -31,9 +31,9 @@ ENV/
 .pixi/
 pixi.lock
 
-# Data files (optional - comment out if you want to track data)
-# data/BTCUSD_1W.csv
-data/bitcoin_risk_data.json
+# Data files
+# Note: bitcoin_risk_data.json is tracked for GitHub Pages deployment
+# data/BTCUSD_1W.csv is also tracked
 
 # Build outputs
 dist/
