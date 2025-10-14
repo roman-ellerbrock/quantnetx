@@ -89,7 +89,10 @@ Or use the [Vercel Dashboard](https://vercel.com) to import your repository dire
 
 ### Methodology
 
-The implied probability distribution is calculated using the Breeden-Litzenberger formula:
+The dashboard offers **four different methods** for calculating implied probability distributions from options prices:
+
+#### 1. Finite Differences (Breeden-Litzenberger) - Default
+The classic approach using the Breeden-Litzenberger formula:
 
 ```
 P(K) = d²C/dK²
@@ -108,7 +111,34 @@ f''(xb) = 2 * (fa * d2 + fc * d1 - fb * (d1 + d2)) / (d1 * d2 * (d1 + d2))
 
 Where `d1 = xb - xa` and `d2 = xc - xb`.
 
-The distribution is then normalized so that the probabilities sum to 1.
+**Pros**: Accurate, standard approach used in academic literature
+**Cons**: Can be sensitive to noise in option prices
+
+#### 2. Cubic Spline Interpolation
+Creates a smooth cubic spline through the option prices, then computes the second derivative analytically. This provides a continuous probability density function.
+
+**Pros**: Smoother distributions, more data points, handles sparse strikes well
+**Cons**: Can introduce artificial smoothing, computationally more intensive
+
+#### 3. Linear Interpolation
+Simplified approach using linear interpolation and standard centered differences:
+
+```
+f''(xb) ≈ (fc - 2*fb + fa) / h²
+```
+
+Where `h` is the average strike spacing.
+
+**Pros**: Fast, simple, less sensitive to outliers
+**Cons**: Less accurate than spline methods, assumes uniform spacing
+
+#### 4. Averaged (Calls + Puts)
+Computes probability distributions from both calls and puts separately, then averages them at each strike. This combines the information from both sides of the market.
+
+**Pros**: Reduces noise and arbitrage discrepancies between calls and puts
+**Cons**: Requires liquid markets on both call and put sides
+
+All distributions are normalized so that probabilities sum to 1.
 
 ### Data Source
 

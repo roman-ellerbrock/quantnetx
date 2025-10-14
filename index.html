@@ -189,9 +189,9 @@
             <p class="subtitle">Risk-Neutral Probability from Options Prices</p>
         </header>
 
-        <div class="info-box">
-            <strong>Method:</strong> Implied probabilities are calculated using the second derivative of option prices (butterfly spread approach).
-            The probability density at each strike is computed using finite differences for non-uniformly spaced strikes, then normalized to sum to 1.
+        <div class="info-box" id="methodInfo">
+            <strong>Method:</strong> <span id="methodDescription">Implied probabilities are calculated using the second derivative of option prices (butterfly spread approach).
+            The probability density at each strike is computed using finite differences for non-uniformly spaced strikes, then normalized to sum to 1.</span>
             Both call and put distributions are shown for comparison. They should theoretically match but may differ due to market microstructure, liquidity, and bid-ask spreads.
         </div>
 
@@ -207,6 +207,13 @@
                 <label for="expirySelect">Expiry Date</label>
                 <select id="expirySelect">
                     <option value="">Loading expiries...</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="methodSelect">Calculation Method</label>
+                <select id="methodSelect">
+                    <option value="finite-diff">Finite Differences (Breeden-Litzenberger)</option>
+                    <option value="cubic-spline">Cubic Spline Interpolation</option>
                 </select>
             </div>
             <div class="control-group">
@@ -369,43 +376,148 @@
         // Probability Calculation Functions
         // ============================================================================
 
+        // ============================================================================
+        // Cubic Spline Helper Functions
+        // ============================================================================
+
+        // Natural cubic spline implementation
+        function cubicSpline(x, y) {
+            const n = x.length - 1;
+            const a = [...y];
+            const b = new Array(n);
+            const c = new Array(n + 1).fill(0);
+            const d = new Array(n);
+            const h = new Array(n);
+            const alpha = new Array(n);
+            const l = new Array(n + 1).fill(1);
+            const mu = new Array(n + 1).fill(0);
+            const z = new Array(n + 1).fill(0);
+
+            // Calculate h values
+            for (let i = 0; i < n; i++) {
+                h[i] = x[i + 1] - x[i];
+            }
+
+            // Calculate alpha values
+            for (let i = 1; i < n; i++) {
+                alpha[i] = (3 / h[i]) * (a[i + 1] - a[i]) - (3 / h[i - 1]) * (a[i] - a[i - 1]);
+            }
+
+            // Solve tridiagonal system
+            for (let i = 1; i < n; i++) {
+                l[i] = 2 * (x[i + 1] - x[i - 1]) - h[i - 1] * mu[i - 1];
+                mu[i] = h[i] / l[i];
+                z[i] = (alpha[i] - h[i - 1] * z[i - 1]) / l[i];
+            }
+
+            // Back substitution
+            for (let j = n - 1; j >= 0; j--) {
+                c[j] = z[j] - mu[j] * c[j + 1];
+                b[j] = (a[j + 1] - a[j]) / h[j] - h[j] * (c[j + 1] + 2 * c[j]) / 3;
+                d[j] = (c[j + 1] - c[j]) / (3 * h[j]);
+            }
+
+            return { a, b, c, d, x };
+        }
+
+        // Evaluate cubic spline at a point
+        function evalSpline(spline, xVal) {
+            const { a, b, c, d, x } = spline;
+
+            // Find the interval
+            let i = 0;
+            for (i = 0; i < x.length - 1; i++) {
+                if (xVal <= x[i + 1]) break;
+            }
+            if (i >= a.length) i = a.length - 1;
+
+            const dx = xVal - x[i];
+            return a[i] + b[i] * dx + c[i] * dx * dx + d[i] * dx * dx * dx;
+        }
+
+        // Evaluate second derivative of cubic spline
+        function evalSplineSecondDerivative(spline, xVal) {
+            const { c, d, x } = spline;
+
+            // Find the interval
+            let i = 0;
+            for (i = 0; i < x.length - 1; i++) {
+                if (xVal <= x[i + 1]) break;
+            }
+            if (i >= c.length) i = c.length - 1;
+
+            const dx = xVal - x[i];
+            return 2 * c[i] + 6 * d[i] * dx;
+        }
+
+        // ============================================================================
+        // Method 1: Finite Differences (Breeden-Litzenberger) - Original Method
+        // ============================================================================
+
         // Calculate probabilities from options using second derivative
-        function calculateProbabilitiesFromOptions(options, underlyingPrice) {
+        function calculateProbabilitiesFromOptions(options, underlyingPrice, method = 'finite-diff') {
             if (options.length < 3) {
                 return [];
             }
 
             const probabilities = [];
 
-            // Calculate second derivative at each interior point
-            for (let i = 1; i < options.length - 1; i++) {
-                // Three consecutive strikes and their prices
-                const xa = options[i - 1].strike;
-                const xb = options[i].strike;
-                const xc = options[i + 1].strike;
+            if (method === 'finite-diff') {
+                // Original finite difference method
+                for (let i = 1; i < options.length - 1; i++) {
+                    const xa = options[i - 1].strike;
+                    const xb = options[i].strike;
+                    const xc = options[i + 1].strike;
 
-                const fa = options[i - 1].mark_price;
-                const fb = options[i].mark_price;
-                const fc = options[i + 1].mark_price;
+                    const fa = options[i - 1].mark_price;
+                    const fb = options[i].mark_price;
+                    const fc = options[i + 1].mark_price;
 
-                // Calculate spacing between strikes
-                const d1 = xb - xa;
-                const d2 = xc - xb;
+                    const d1 = xb - xa;
+                    const d2 = xc - xb;
 
-                if (d1 <= 0 || d2 <= 0) continue;
+                    if (d1 <= 0 || d2 <= 0) continue;
 
-                // Second derivative for non-uniformly spaced points
-                // Formula: f''(xb) = 2 * (fa * d2 + fc * d1 - fb * (d1 + d2)) / (d1 * d2 * (d1 + d2))
-                const secondDerivative = 2 * (fa * d2 + fc * d1 - fb * (d1 + d2)) / (d1 * d2 * (d1 + d2));
+                    // Second derivative for non-uniformly spaced points
+                    const secondDerivative = 2 * (fa * d2 + fc * d1 - fb * (d1 + d2)) / (d1 * d2 * (d1 + d2));
 
-                // Probability density is proportional to the second derivative
-                // Only keep positive values (negative would imply arbitrage opportunity)
-                if (secondDerivative > 0) {
-                    probabilities.push({
-                        strike: xb,
-                        probability: secondDerivative,
-                        iv: options[i].mark_iv
-                    });
+                    if (secondDerivative > 0) {
+                        probabilities.push({
+                            strike: xb,
+                            probability: secondDerivative,
+                            iv: options[i].mark_iv
+                        });
+                    }
+                }
+            } else if (method === 'cubic-spline') {
+                // Cubic spline interpolation method
+                const strikes = options.map(o => o.strike);
+                const prices = options.map(o => o.mark_price);
+
+                // Create cubic spline
+                const spline = cubicSpline(strikes, prices);
+
+                // Generate dense grid of strikes
+                const minStrike = strikes[0];
+                const maxStrike = strikes[strikes.length - 1];
+                const numPoints = Math.max(100, strikes.length * 10);
+                const strikeStep = (maxStrike - minStrike) / numPoints;
+
+                for (let k = minStrike; k <= maxStrike - strikeStep; k += strikeStep) {
+                    const secondDeriv = evalSplineSecondDerivative(spline, k);
+
+                    if (secondDeriv > 0) {
+                        // Find closest option for IV
+                        const closestOption = options.reduce((prev, curr) =>
+                            Math.abs(curr.strike - k) < Math.abs(prev.strike - k) ? curr : prev
+                        );
+
+                        probabilities.push({
+                            strike: k,
+                            probability: secondDeriv,
+                            iv: closestOption.mark_iv
+                        });
+                    }
                 }
             }
 
@@ -425,7 +537,7 @@
         }
 
         // Calculate implied probability distribution from both calls and puts
-        function calculateImpliedProbability(optionsData) {
+        function calculateImpliedProbability(optionsData, method = 'finite-diff') {
             // Filter and sort calls and puts
             const calls = optionsData
                 .filter(d => d.option_type === 'C' && d.mark_price > 0)
@@ -452,11 +564,11 @@
             }
 
             // Calculate probabilities from calls and puts
-            const callProbabilities = calls.length >= 3 ?
-                calculateProbabilitiesFromOptions(calls, underlyingPrice) : [];
+            let callProbabilities = calls.length >= 3 ?
+                calculateProbabilitiesFromOptions(calls, underlyingPrice, method) : [];
 
-            const putProbabilities = puts.length >= 3 ?
-                calculateProbabilitiesFromOptions(puts, underlyingPrice) : [];
+            let putProbabilities = puts.length >= 3 ?
+                calculateProbabilitiesFromOptions(puts, underlyingPrice, method) : [];
 
             if (callProbabilities.length === 0 && putProbabilities.length === 0) {
                 throw new Error('No valid probabilities calculated from calls or puts');
@@ -1056,10 +1168,24 @@
         // Event Handlers
         // ============================================================================
 
+        // Update method description based on selected method
+        function updateMethodDescription() {
+            const method = document.getElementById('methodSelect').value;
+            const descriptionSpan = document.getElementById('methodDescription');
+
+            const descriptions = {
+                'finite-diff': 'Implied probabilities are calculated using the Breeden-Litzenberger formula: the second derivative of option prices with respect to strike. Uses finite differences for non-uniformly spaced strikes.',
+                'cubic-spline': 'Uses cubic spline interpolation to create a smooth function through option prices, then computes the second derivative analytically. Provides smoother distributions with more data points.'
+            };
+
+            descriptionSpan.textContent = descriptions[method] || descriptions['finite-diff'];
+        }
+
         // Handle expiry selection - fetch data and calculate probabilities
         async function handleExpiryChange() {
             const selectedExpiry = document.getElementById('expirySelect').value;
             const selectedCurrency = document.getElementById('currencySelect').value;
+            const selectedMethod = document.getElementById('methodSelect').value;
 
             if (!selectedExpiry) {
                 document.getElementById('chartContainer').style.display = 'none';
@@ -1084,8 +1210,8 @@
                     throw new Error('No data available for the selected expiry');
                 }
 
-                // Calculate implied probabilities
-                const result = calculateImpliedProbability(allData);
+                // Calculate implied probabilities using selected method
+                const result = calculateImpliedProbability(allData, selectedMethod);
 
                 if (result.callProbabilities.length === 0 && result.putProbabilities.length === 0) {
                     throw new Error('Unable to calculate probabilities (insufficient valid data)');
@@ -1153,6 +1279,15 @@
         // Expiry change - recalculate probabilities
         document.getElementById('expirySelect').addEventListener('change', handleExpiryChange);
 
+        // Method change - update description and recalculate
+        document.getElementById('methodSelect').addEventListener('change', () => {
+            updateMethodDescription();
+            const selectedExpiry = document.getElementById('expirySelect').value;
+            if (selectedExpiry) {
+                handleExpiryChange();
+            }
+        });
+
         // Derivative display mode change - update chart
         document.getElementById('derivativeSelect').addEventListener('change', () => {
             if (allData.length > 0) {
@@ -1176,6 +1311,7 @@
         // ============================================================================
 
         // Initialize on page load
+        updateMethodDescription();
         loadExpiries();
     </script>
 </body>

@@ -2,7 +2,7 @@
 ✨ YOUR NEW REPOSITORY IS READY! ✨
 ================================================================================
 
-Location: /tmp/implied-probabilities-dashboard
+Location: /tmp/quantnetx
 
 What's included:
   ✅ index.html        - Your dashboard (45KB, single file)
@@ -20,22 +20,22 @@ What's included:
 
 STEP 1: Move to your projects folder
 -------------------------------------
-cd /tmp/implied-probabilities-dashboard
+cd /tmp/quantnetx
 # Or move it first:
-# mv /tmp/implied-probabilities-dashboard ~/projects/implied-probabilities-dashboard
+# mv /tmp/quantnetx ~/projects/quantnetx
 
 STEP 2: Create GitHub repository
 ---------------------------------
 Option A - Using GitHub CLI (easiest):
   gh auth login
-  gh repo create implied-probabilities-dashboard --public --source=. --push
+  gh repo create quantnetx --public --source=. --push
 
 Option B - Manual:
   1. Go to https://github.com/new
-  2. Create repo: "implied-probabilities-dashboard"
+  2. Create repo: "quantnetx"
   3. Don't initialize with anything
   4. Then run:
-     git remote add origin https://github.com/YOUR_USERNAME/implied-probabilities-dashboard.git
+     git remote add origin https://github.com/YOUR_USERNAME/quantnetx.git
      git push -u origin main
 
 STEP 3: Deploy (pick one)
@@ -43,12 +43,12 @@ STEP 3: Deploy (pick one)
 🌐 GitHub Pages (Free, Easy):
   - Go to repo Settings → Pages
   - Deploy from branch: main / (root)
-  - URL: https://YOUR_USERNAME.github.io/implied-probabilities-dashboard/
+  - URL: https://YOUR_USERNAME.github.io/quantnetx/
 
 ⚡ Vercel (Fast, Professional):
   npm install -g vercel
   vercel
-  # URL: https://implied-probabilities-dashboard.vercel.app/
+  # URL: https://quantnetx.vercel.app/
 
 🎯 Netlify (Alternative):
   - Drag folder to https://app.netlify.com/drop
@@ -59,7 +59,7 @@ STEP 3: Deploy (pick one)
 ================================================================================
 
 Test locally first:
-  cd /tmp/implied-probabilities-dashboard
+  cd /tmp/quantnetx
   python3 -m http.server 8000
   # Open: http://localhost:8000
 
