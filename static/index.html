@@ -1098,18 +1098,36 @@
             // Convert Unix timestamps to Date objects (multiply by 1000 for milliseconds)
             const dateObjects = timeUnix.map(ts => new Date(ts * 1000));
 
-            // Apply square root transformation and multiply by 100 for percentage display
-            // sqrt compresses the scale making more of the distribution visible
-            const probabilitiesPercent = probabilities.map(row => row.map(val => Math.sqrt(val) * 100));
+            // Normalize probabilities: for each time (column), scale by the max at that time
+            const numPrices = probabilities.length;
+            const numTimes = probabilities[0].length;
 
-            // Create custom colorscale with transparency for low values
+            // Find max for each time slice
+            const maxByTime = [];
+            for (let t = 0; t < numTimes; t++) {
+                let maxVal = 0;
+                for (let p = 0; p < numPrices; p++) {
+                    if (probabilities[p][t] > maxVal) {
+                        maxVal = probabilities[p][t];
+                    }
+                }
+                maxByTime.push(maxVal);
+            }
+
+            // Normalize by max**0.75 and convert to percentage
+            const probabilitiesPercent = probabilities.map(row =>
+                row.map((val, t) => maxByTime[t] > 0 ? (val / Math.pow(maxByTime[t], 0.75)) * 100 : 0)
+            );
+
+            // Custom colorscale: blue -> cyan -> yellow -> red with transparency for low values (ggplot2 style)
             const customColorscale = [
-                [0, 'rgba(68, 1, 84, 0)'],      // Transparent purple (0% probability)
-                [0.2, 'rgba(68, 1, 84, 0.3)'],  // Low opacity purple
-                [0.4, 'rgba(59, 82, 139, 0.7)'], // Medium opacity blue
-                [0.6, 'rgba(33, 145, 140, 1)'],  // Full opacity teal
-                [0.8, 'rgba(94, 201, 98, 1)'],   // Full opacity green
-                [1, 'rgba(253, 231, 37, 1)']     // Full opacity yellow (100% probability)
+                [0, 'rgba(0, 0, 255, 0)'],        // Transparent blue
+                [0.15, 'rgba(0, 0, 255, 0.2)'],   // Low opacity blue
+                [0.3, 'rgba(0, 127, 255, 0.5)'],  // Medium opacity cyan-blue
+                [0.5, 'rgba(0, 255, 255, 0.8)'],  // Higher opacity cyan
+                [0.7, 'rgba(255, 255, 0, 1)'],    // Full opacity yellow
+                [0.85, 'rgba(255, 127, 0, 1)'],   // Full opacity orange
+                [1, 'rgba(255, 0, 0, 1)']         // Full opacity red
             ];
 
             const traces = [];

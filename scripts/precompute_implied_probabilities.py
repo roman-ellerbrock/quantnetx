@@ -517,14 +517,14 @@ def create_visualization_density(probabilities: List[Dict],
 
 def precompute_all_probabilities(currencies: List[str] = None,
                                  method: str = 'finite-diff',
-                                 max_days: int = 90) -> Dict:
+                                 max_days: int = 180) -> Dict:
     """
     Precompute implied probabilities for multiple currencies and expiries.
 
     Args:
         currencies: List of currencies to process (default: ['BTC', 'ETH'])
         method: Calculation method ('finite-diff' or 'cubic-spline')
-        max_days: Maximum days to expiry to include (default: 90)
+        max_days: Maximum days to expiry to include (default: 180)
 
     Returns:
         Dict with all computed probabilities
@@ -632,7 +632,7 @@ def main():
     results = precompute_all_probabilities(
         currencies=['BTC', 'ETH'],
         method='finite-diff',
-        max_days=90  # Compute for expiries up to 90 days out
+        max_days=180  # Compute for expiries up to 180 days out
     )
 
     # Save to JSON

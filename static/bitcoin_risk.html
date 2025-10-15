@@ -60,6 +60,7 @@
 
     <script>
         let riskData = null;
+        let probabilitySurfaceData = null;
 
         // ============================================================================
         // Utility Functions
@@ -110,6 +111,45 @@
                 showError('Error loading risk data: ' + error.message);
                 return null;
             }
+        }
+
+        async function loadProbabilitySurface() {
+            try {
+                const response = await fetch('../data/probability_surface.json');
+                if (!response.ok) {
+                    console.warn('Probability surface data not available');
+                    return;
+                }
+                probabilitySurfaceData = await response.json();
+            } catch (error) {
+                console.warn('Could not load probability surface:', error);
+            }
+        }
+
+        // Calculate risk metric for a given price and time
+        function calculateRiskMetric(price, time, data) {
+            // Find the closest time index
+            const times = data.data.times;
+            const fitted_undervalued = data.data.fitted_undervalued;
+            const fitted_extreme_over = data.data.fitted_extreme_overvalued;
+
+            let closestIndex = 0;
+            let minDiff = Math.abs(times[0] - time);
+
+            for (let i = 1; i < times.length; i++) {
+                const diff = Math.abs(times[i] - time);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = i;
+                }
+            }
+
+            const undervalued = fitted_undervalued[closestIndex];
+            const overvalued = fitted_extreme_over[closestIndex];
+
+            // Normalize: 0 = extreme undervalued, 1 = extreme overvalued
+            const risk = (price - undervalued) / (overvalued - undervalued);
+            return Math.max(0, Math.min(1, risk)); // Clamp between 0 and 1
         }
 
         // ============================================================================
@@ -200,7 +240,7 @@
         // Plotting Functions
         // ============================================================================
 
-        function plotRiskMetric(data) {
+        async function plotRiskMetric(data) {
             const scaleType = document.getElementById('scaleSelect').value;
             const times = data.data.times;
             const prices = data.data.prices;
@@ -215,6 +255,127 @@
             const dates = times.map(t => new Date(t * 1000));
 
             const traces = [];
+
+            // Add probability density heatmap if available
+            if (probabilitySurfaceData && probabilitySurfaceData.surfaces && probabilitySurfaceData.surfaces.BTC) {
+                const surfaceData = probabilitySurfaceData.surfaces.BTC.combined_surface;
+                const timeUnix = surfaceData.grid.time_unix;
+                const surfacePrices = surfaceData.grid.prices;
+                const probabilities = surfaceData.grid.probabilities;
+
+                // Convert Unix timestamps to Date objects
+                const dateObjects = timeUnix.map(ts => new Date(ts * 1000));
+
+                // Normalize probabilities: for each time (column), scale by sqrt of max at that time
+                const numPrices = probabilities.length;
+                const numTimes = probabilities[0].length;
+
+                // Find max for each time slice
+                const maxByTime = [];
+                for (let t = 0; t < numTimes; t++) {
+                    let maxVal = 0;
+                    for (let p = 0; p < numPrices; p++) {
+                        if (probabilities[p][t] > maxVal) {
+                            maxVal = probabilities[p][t];
+                        }
+                    }
+                    maxByTime.push(maxVal);
+                }
+
+                // Normalize and convert to percentage
+                const probabilitiesPercent = probabilities.map(row =>
+                    row.map((val, t) => maxByTime[t] > 0 ? (val / Math.pow(maxByTime[t], 0.75)) * 100 : 0)
+                );
+
+                // Custom colorscale: blue -> cyan -> yellow -> red with transparency for low values (ggplot2 style)
+                const customColorscale = [
+                    [0, 'rgba(0, 0, 255, 0)'],        // Transparent blue
+                    [0.15, 'rgba(0, 0, 255, 0.2)'],   // Low opacity blue
+                    [0.3, 'rgba(0, 127, 255, 0.5)'],  // Medium opacity cyan-blue
+                    [0.5, 'rgba(0, 255, 255, 0.8)'],  // Higher opacity cyan
+                    [0.7, 'rgba(255, 255, 0, 0.8)'],    // Full opacity yellow
+                    [0.85, 'rgba(255, 127, 0, 0.8)'],   // Full opacity orange
+                    [1, 'rgba(255, 0, 0, 0.8)']         // Full opacity red
+                ];
+
+                // Add heatmap trace (will be rendered behind other traces)
+                traces.push({
+                    z: probabilitiesPercent,
+                    x: dateObjects,
+                    y: surfacePrices,
+                    type: 'heatmap',
+                    colorscale: customColorscale,
+                    showscale: false,  // Don't show colorbar for density
+                    hovertemplate: 'Date: %{x|%b %d, %Y}<br>Price: $%{y:,.0f}<br>Scaled Prob Density: %{z:.3f}%<extra></extra>',
+                    name: 'Probability Density'
+                });
+
+                // Load expected prices and add trace BEFORE risk bands
+                try {
+                    const response = await fetch('../data/implied_probabilities.json');
+                    if (response.ok) {
+                        const probData = await response.json();
+                        const currencyData = probData.currencies.BTC;
+                        const expectedPrices = [];
+
+                        // Extract expected prices for each expiry
+                        for (const expiryKey in currencyData) {
+                            const expiryData = currencyData[expiryKey];
+                            const expiryTimestamp = expiryData.expiration_timestamp / 1000;
+                            const expectedPrice = expiryData.call_statistics?.expected_price;
+
+                            if (expectedPrice && expiryTimestamp) {
+                                expectedPrices.push({
+                                    time: expiryTimestamp,
+                                    date: new Date(expiryTimestamp * 1000),
+                                    price: expectedPrice
+                                });
+                            }
+                        }
+
+                        // Sort by time
+                        expectedPrices.sort((a, b) => a.time - b.time);
+
+                        if (expectedPrices.length > 0) {
+                            // Calculate risk values for expected prices
+                            const expectedRisk = expectedPrices.map(ep =>
+                                calculateRiskMetric(ep.price, ep.time, data)
+                            );
+
+                            // Add expected price trace (appears in front of heatmap)
+                            traces.push({
+                                x: expectedPrices.map(p => p.date),
+                                y: expectedPrices.map(p => p.price),
+                                type: 'scatter',
+                                mode: 'lines+markers',
+                                name: 'Expected Price (Options)',
+                                line: {
+                                    width: 2,
+                                    dash: 'dash'
+                                },
+                                marker: {
+                                    size: 6,
+                                    color: expectedRisk,
+                                    colorscale: [
+                                        [0, '#0d47a1'],
+                                        [0.25, '#2196f3'],
+                                        [0.5, '#ffc107'],
+                                        [0.75, '#ff9800'],
+                                        [1, '#b71c1c']
+                                    ],
+                                    cmin: 0,
+                                    cmax: 1,
+                                    showscale: false,
+                                    line: { width: 1, color: '#ffffff' }
+                                },
+                                hovertemplate: 'Date: %{x|%b %d, %Y}<br>Expected: $%{y:,.0f}<extra></extra>'
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn('Could not load expected prices:', err);
+                }
+            }
 
             // Extreme overvalued boundary (dark red - top of rainbow)
             traces.push({
@@ -555,6 +716,11 @@
         // ============================================================================
 
         async function initialize() {
+            // Load probability surface data (don't block on errors)
+            await loadProbabilitySurface().catch(err => {
+                console.warn('Failed to load probability surface:', err);
+            });
+
             const data = await loadRiskData();
 
             if (data) {

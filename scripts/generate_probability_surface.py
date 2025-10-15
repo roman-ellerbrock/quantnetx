@@ -85,13 +85,28 @@ def create_2d_probability_surface(prob_data: Dict,
     time_min, time_max = time_array.min(), time_array.max()
     price_min, price_max = price_array.min(), price_array.max()
 
+    # Extend time to 180 days if needed
+    target_max_days = 180
+    target_max_time = now + (target_max_days * 24 * 60 * 60)  # 180 days from now in seconds
+
+    if time_max < target_max_time:
+        # Add extrapolated time point at 180 days
+        time_max = target_max_time
+
     # Add some padding to price
     price_range = price_max - price_min
     price_min_padded = price_min - 0.05 * price_range
     price_max_padded = price_max + 0.05 * price_range
 
-    # Create grid - use actual expiry timestamps (in seconds)
-    time_grid = np.unique(time_array)  # Unique timestamps
+    # Create grid - use actual expiry timestamps plus extrapolated point
+    unique_times = np.unique(time_array)
+
+    # Add 180 day point if it's beyond our data
+    if unique_times[-1] < target_max_time:
+        time_grid = np.append(unique_times, target_max_time)
+    else:
+        time_grid = unique_times
+
     price_grid = np.linspace(price_min_padded, price_max_padded, price_points)
 
     # Create meshgrid
@@ -104,6 +119,30 @@ def create_2d_probability_surface(prob_data: Dict,
 
     # Ensure non-negative probabilities
     grid_prob = np.maximum(grid_prob, 0.0)
+
+    # Extrapolate for 180d point if needed (simple linear extrapolation from last two points)
+    if len(time_grid) > len(unique_times):
+        # We added an extrapolated point
+        if len(unique_times) >= 2:
+            # Get the last two columns (time slices)
+            second_last_col = grid_prob[:, -2]
+            third_last_col = grid_prob[:, -3] if grid_prob.shape[1] > 2 else second_last_col
+
+            # Linear extrapolation: extend the trend
+            # Get time differences
+            t_last = unique_times[-1]
+            t_second_last = unique_times[-2] if len(unique_times) > 1 else unique_times[-1]
+            t_target = time_grid[-1]
+
+            # Extrapolate: prob_target = prob_last + (prob_last - prob_second_last) * dt_ratio
+            dt_ratio = (t_target - t_last) / max(t_last - t_second_last, 1)
+            extrapolated = second_last_col + (second_last_col - third_last_col) * dt_ratio
+
+            # Ensure non-negative
+            extrapolated = np.maximum(extrapolated, 0.0)
+
+            # Assign to last column
+            grid_prob[:, -1] = extrapolated
 
     # Normalize each time slice to sum to 1
     for i, t in enumerate(time_grid):
