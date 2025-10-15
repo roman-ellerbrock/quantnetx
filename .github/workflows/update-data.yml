@@ -35,6 +35,14 @@ jobs:
         run: |
           python scripts/bitcoin_risk_regression.py
 
+      - name: Precompute implied probabilities
+        run: |
+          python scripts/precompute_implied_probabilities.py
+
+      - name: Generate probability surface data
+        run: |
+          python scripts/generate_probability_surface.py
+
       - name: Check for changes
         id: verify_diff
         run: |
@@ -46,7 +54,7 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/
-          git commit -m "chore: Update Bitcoin data and risk analysis
+          git commit -m "chore: Update Bitcoin data, risk analysis, and probability surfaces
 
           Automated update from scheduled workflow
 

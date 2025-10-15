@@ -46,15 +46,19 @@ python -m http.server 8000
 
 Or run individually:
 ```bash
-pixi run python scripts/update_bitcoin_data.py      # Fetch latest prices
-pixi run python scripts/bitcoin_risk_regression.py  # Regenerate analysis
+pixi run python scripts/update_bitcoin_data.py               # Fetch latest prices
+pixi run python scripts/bitcoin_risk_regression.py           # Regenerate analysis
+pixi run python scripts/precompute_implied_probabilities.py  # Precompute options probabilities
+pixi run python scripts/generate_probability_surface.py      # Generate 2D probability surface
 ```
 
 ## Features
 
 - **Bitcoin Risk Metric** - Logarithmic regression with 6 risk bands, 2-year projections
 - **Options Analysis** - Implied probability distributions from Deribit options (BTC/ETH)
-- **Live Data** - Auto-updates from Binance and Deribit APIs
+- **2D Probability Surface** - Time x Price contour data for probability heatmaps
+- **Live Data** - Auto-updates from Binance and Deribit APIs (4x daily)
+- **Precomputed Data** - Cached probability data for fast access
 - **Interactive Charts** - Plotly.js visualizations with risk color-coding
 
 ## Technical Details
@@ -66,6 +70,9 @@ pixi run python scripts/bitcoin_risk_regression.py  # Regenerate analysis
 **Options Analysis:**
 - Breeden-Litzenberger formula (second derivative of option prices)
 - Methods: Finite differences, cubic spline interpolation
+- Precomputed probabilities: `data/implied_probabilities.json`
+- 2D probability surface: `data/probability_surface.json` (Time x Price grid)
+- Updated 4x daily via GitHub Actions (00:00, 06:00, 12:00, 18:00 UTC)
 
 ## Data Sources
 

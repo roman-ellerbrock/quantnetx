@@ -80,6 +80,10 @@
             </div>
             <div id="markPriceChart"></div>
         </div>
+
+        <div class="chart-container" id="contourChartContainer" style="display: none;">
+            <div id="contourChart"></div>
+        </div>
     </div>
 
     <script>
@@ -88,6 +92,7 @@
         // ============================================================================
         let allData = [];
         let availableExpiries = [];
+        let probabilitySurfaceData = null;
         const DERIBIT_API_BASE = 'https://www.deribit.com/api/v2/public';
 
         // ============================================================================
@@ -117,6 +122,22 @@
         // ============================================================================
         // API Data Fetching
         // ============================================================================
+
+        // Load precomputed probability surface data
+        async function loadProbabilitySurface() {
+            try {
+                const response = await fetch('../data/probability_surface.json');
+                if (!response.ok) {
+                    console.warn('Probability surface data not available');
+                    return null;
+                }
+                probabilitySurfaceData = await response.json();
+                return probabilitySurfaceData;
+            } catch (error) {
+                console.warn('Could not load probability surface:', error);
+                return null;
+            }
+        }
 
         // Fetch available expiry dates from Deribit
         async function fetchAvailableExpiries(currency = 'BTC') {
@@ -1022,6 +1043,151 @@
             }, 100);
         }
 
+        // Plot probability contour (price vs time)
+        async function plotProbabilityContour() {
+            if (!probabilitySurfaceData) {
+                console.warn('Probability surface data not available');
+                return;
+            }
+
+            const currency = document.getElementById('currencySelect').value;
+
+            if (!probabilitySurfaceData.surfaces || !probabilitySurfaceData.surfaces[currency]) {
+                console.warn(`No surface data for ${currency}`);
+                return;
+            }
+
+            const surfaceData = probabilitySurfaceData.surfaces[currency].combined_surface;
+            const currentPrice = surfaceData.current_price;
+
+            // Load implied probabilities to get expected prices
+            let expectedPrices = [];
+            try {
+                const response = await fetch('../data/implied_probabilities.json');
+                if (response.ok) {
+                    const probData = await response.json();
+                    const currencyData = probData.currencies[currency];
+
+                    // Extract expected prices for each expiry
+                    for (const expiryKey in currencyData) {
+                        const expiryData = currencyData[expiryKey];
+                        const expiryTimestamp = expiryData.expiration_timestamp / 1000; // Convert to seconds
+                        const expectedPrice = expiryData.call_statistics?.expected_price;
+
+                        if (expectedPrice && expiryTimestamp) {
+                            expectedPrices.push({
+                                time: new Date(expiryTimestamp * 1000),
+                                price: expectedPrice
+                            });
+                        }
+                    }
+
+                    // Sort by time
+                    expectedPrices.sort((a, b) => a.time - b.time);
+                }
+            } catch (error) {
+                console.warn('Could not load expected prices:', error);
+            }
+
+            // Extract grid data
+            const timeUnix = surfaceData.grid.time_unix;  // Unix timestamps in seconds
+            const timeDates = surfaceData.grid.time_dates;  // ISO date strings
+            const prices = surfaceData.grid.prices;
+            const probabilities = surfaceData.grid.probabilities; // 2D array [price_index][time_index]
+
+            // Convert Unix timestamps to Date objects (multiply by 1000 for milliseconds)
+            const dateObjects = timeUnix.map(ts => new Date(ts * 1000));
+
+            // Apply square root transformation and multiply by 100 for percentage display
+            // sqrt compresses the scale making more of the distribution visible
+            const probabilitiesPercent = probabilities.map(row => row.map(val => Math.sqrt(val) * 100));
+
+            // Create custom colorscale with transparency for low values
+            const customColorscale = [
+                [0, 'rgba(68, 1, 84, 0)'],      // Transparent purple (0% probability)
+                [0.2, 'rgba(68, 1, 84, 0.3)'],  // Low opacity purple
+                [0.4, 'rgba(59, 82, 139, 0.7)'], // Medium opacity blue
+                [0.6, 'rgba(33, 145, 140, 1)'],  // Full opacity teal
+                [0.8, 'rgba(94, 201, 98, 1)'],   // Full opacity green
+                [1, 'rgba(253, 231, 37, 1)']     // Full opacity yellow (100% probability)
+            ];
+
+            const traces = [];
+
+            // Heatmap trace
+            traces.push({
+                z: probabilitiesPercent,
+                x: dateObjects,
+                y: prices,
+                type: 'heatmap',
+                colorscale: customColorscale,
+                colorbar: {
+                    title: 'Probability<br>Density (%)',
+                    titleside: 'right',
+                    thickness: 15,
+                    len: 0.7,
+                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    bordercolor: 'rgba(255, 255, 255, 0.2)',
+                    borderwidth: 1,
+                    tickfont: { color: '#e4e4e4' },
+                    titlefont: { color: '#e4e4e4' }
+                },
+                hovertemplate: 'Date: %{x|%b %d, %Y}<br>Price: $%{y:,.0f}<br>Prob: %{z:.3f}%<extra></extra>'
+            });
+
+            // Expected price line trace
+            if (expectedPrices.length > 0) {
+                traces.push({
+                    x: expectedPrices.map(p => p.time),
+                    y: expectedPrices.map(p => p.price),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Expected Price',
+                    line: {
+                        color: '#ffc107',
+                        width: 1,
+                        dash: 'dash'
+                    },
+                    hovertemplate: 'Date: %{x|%b %d, %Y}<br>Expected: $%{y:,.0f}<extra></extra>'
+                });
+            }
+
+            const layout = {
+                title: {
+                    text: `${currency} Implied Probability Surface (Price vs Time)`,
+                    font: { color: '#e4e4e4', size: 20 }
+                },
+                xaxis: {
+                    title: 'Expiry Date',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    type: 'date'
+                },
+                yaxis: {
+                    title: 'Price (USD)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    tickformat: '$,.0f'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            document.getElementById('contourChartContainer').style.display = 'block';
+            Plotly.newPlot('contourChart', traces, layout, config);
+
+            setTimeout(() => {
+                Plotly.Plots.resize('contourChart');
+            }, 100);
+        }
+
         // ============================================================================
         // Event Handlers
         // ============================================================================
@@ -1049,6 +1215,7 @@
                 document.getElementById('chartContainer').style.display = 'none';
                 document.getElementById('cumulativeChartContainer').style.display = 'none';
                 document.getElementById('markPriceChartContainer').style.display = 'none';
+                document.getElementById('contourChartContainer').style.display = 'none';
                 document.getElementById('stats').style.display = 'none';
                 return;
             }
@@ -1058,6 +1225,7 @@
             document.getElementById('chartContainer').style.display = 'none';
             document.getElementById('cumulativeChartContainer').style.display = 'none';
             document.getElementById('markPriceChartContainer').style.display = 'none';
+            document.getElementById('contourChartContainer').style.display = 'none';
             document.getElementById('stats').style.display = 'none';
 
             try {
@@ -1080,6 +1248,11 @@
                 plotProbabilityDistribution(result);
                 plotCumulativeDistribution(result);
                 plotMarkPrices(allData, result.underlyingPrice);
+
+                // Plot contour if data is available
+                if (probabilitySurfaceData) {
+                    plotProbabilityContour();
+                }
 
             } catch (error) {
                 showError(error.message);
@@ -1130,6 +1303,7 @@
             document.getElementById('chartContainer').style.display = 'none';
             document.getElementById('cumulativeChartContainer').style.display = 'none';
             document.getElementById('markPriceChartContainer').style.display = 'none';
+            document.getElementById('contourChartContainer').style.display = 'none';
             document.getElementById('stats').style.display = 'none';
             loadExpiries();
         });
@@ -1169,8 +1343,19 @@
         // ============================================================================
 
         // Initialize on page load
-        updateMethodDescription();
-        loadExpiries();
+        async function initialize() {
+            updateMethodDescription();
+
+            // Load probability surface data first (don't block on errors)
+            await loadProbabilitySurface().catch(err => {
+                console.warn('Failed to load probability surface:', err);
+            });
+
+            // Then load expiries and auto-select first one
+            loadExpiries();
+        }
+
+        initialize();
 
         // Window Resize Handler - resize charts when window is resized
         window.addEventListener('resize', () => {
@@ -1182,6 +1367,9 @@
             }
             if (document.getElementById('markPriceChartContainer').style.display !== 'none') {
                 Plotly.Plots.resize('markPriceChart');
+            }
+            if (document.getElementById('contourChartContainer').style.display !== 'none') {
+                Plotly.Plots.resize('contourChart');
             }
         });
     </script>

@@ -30,7 +30,28 @@ if [ $REGRESSION_STATUS -ne 0 ]; then
 fi
 
 echo ""
+echo "Step 3: Precomputing implied probabilities..."
+pixi run python scripts/precompute_implied_probabilities.py
+PROB_STATUS=$?
+
+if [ $PROB_STATUS -ne 0 ]; then
+    echo "ERROR: Failed to precompute probabilities"
+    exit 1
+fi
+
+echo ""
+echo "Step 4: Generating probability surface data..."
+pixi run python scripts/generate_probability_surface.py
+SURFACE_STATUS=$?
+
+if [ $SURFACE_STATUS -ne 0 ]; then
+    echo "ERROR: Failed to generate probability surface"
+    exit 1
+fi
+
+echo ""
 echo "========================================="
-echo "✓ Charts refreshed successfully!"
+echo "✓ All data refreshed successfully!"
 echo "   Open static/bitcoin_risk.html to view"
+echo "   Open static/index.html for options"
 echo "========================================="
