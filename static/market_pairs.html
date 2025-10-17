@@ -28,6 +28,11 @@
             <strong>Market Pairs Analysis:</strong> Compare relative performance between different assets.
             Select two symbols to create a trading pair ratio chart (e.g., BTC/Gold, SP500/NASDAQ).
             The chart shows the ratio of the first asset divided by the second asset over time.
+            <br><br>
+            <strong>Power Law Model:</strong> R(t) = R(0) · exp(μ·t), or in log space: log(R(t)) = log(R(0)) + μ·t,
+            where μ is the exponential growth rate (annualized). The dashed orange line shows the fitted exponential trend.
+            The parallel orange bands show ±1 standard deviation of the residuals in log space,
+            representing typical deviations from the trend line.
         </div>
 
         <div class="controls">
@@ -35,14 +40,14 @@
                 <label for="numeratorSelect">Numerator</label>
                 <select id="numeratorSelect">
                     <option value="">Select asset...</option>
-                    <option value="btc">Bitcoin (BTC)</option>
+                    <option value="btc" selected>Bitcoin (BTC)</option>
                     <option value="sp500">S&P 500</option>
                     <option value="nasdaq">NASDAQ</option>
                     <option value="gold">Gold</option>
                     <option value="copper">Copper</option>
                     <option value="oil">Oil (WTI)</option>
                     <option value="tlt">TLT (20Y Treasury)</option>
-                    <option value="usd" selected>USD (Cash)</option>
+                    <option value="usd">USD (Cash)</option>
                 </select>
             </div>
             <div class="control-group">
@@ -85,6 +90,8 @@
     <script>
         // Market data cache
         const marketData = {};
+        let powerLawFits = null;  // Power law fits cache
+
         const SYMBOL_NAMES = {
             'btc': 'Bitcoin',
             'sp500': 'S&P 500',
@@ -129,6 +136,27 @@
         // ============================================================================
         // Data Loading
         // ============================================================================
+
+        async function loadPowerLawFits() {
+            if (powerLawFits) {
+                return powerLawFits;
+            }
+
+            try {
+                const response = await fetch('../data/power_law_fits.json');
+                if (!response.ok) {
+                    console.warn('Power law fits not available');
+                    return null;
+                }
+
+                const data = await response.json();
+                powerLawFits = data.fits;
+                return powerLawFits;
+            } catch (error) {
+                console.warn('Could not load power law fits:', error);
+                return null;
+            }
+        }
 
         async function loadMarketData(symbol) {
             // Return cached data if available
@@ -264,12 +292,30 @@
         // Visualization
         // ============================================================================
 
-        function updateStats(stats, numSymbol, denomSymbol, normalize) {
+        function updateStats(stats, numSymbol, denomSymbol, normalize, powerLawFit) {
             const statsDiv = document.getElementById('stats');
 
             const pairName = normalize ?
                 `${SYMBOL_NAMES[numSymbol]}/${SYMBOL_NAMES[denomSymbol]} (Normalized)` :
                 `${SYMBOL_NAMES[numSymbol]}/${SYMBOL_NAMES[denomSymbol]}`;
+
+            let powerLawStatsHtml = '';
+            if (powerLawFit && !isNaN(powerLawFit.drift_annual) && !isNaN(powerLawFit.volatility_annual)) {
+                powerLawStatsHtml = `
+                    <div class="stat-card" style="border-left: 3px solid #f6ad55;">
+                        <div class="stat-label">Growth Rate (μ)</div>
+                        <div class="stat-value">${powerLawFit.drift_annual >= 0 ? '+' : ''}${formatNumber(powerLawFit.drift_annual * 100, 2)}%/yr</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 3px solid #f6ad55;">
+                        <div class="stat-label">Volatility (σ)</div>
+                        <div class="stat-value">${formatNumber(powerLawFit.volatility_annual * 100, 2)}%/yr</div>
+                    </div>
+                    <div class="stat-card" style="border-left: 3px solid #f6ad55;">
+                        <div class="stat-label">R²</div>
+                        <div class="stat-value">${formatNumber(powerLawFit.r_squared, 3)}</div>
+                    </div>
+                `;
+            }
 
             const html = `
                 <div class="stat-card">
@@ -298,18 +344,22 @@
                     <div class="stat-label">Minimum</div>
                     <div class="stat-value">${formatNumber(stats.min, 4)}</div>
                 </div>
+                ${powerLawStatsHtml}
             `;
 
             statsDiv.innerHTML = html;
             statsDiv.style.display = 'grid';
         }
 
-        function plotPairChart(aligned, ratios, numSymbol, denomSymbol, scale, normalize) {
+        function plotPairChart(aligned, ratios, numSymbol, denomSymbol, scale, normalize, powerLawFit) {
             const dates = aligned.dates.map(d => new Date(d));
 
             const pairName = `${SYMBOL_NAMES[numSymbol]}/${SYMBOL_NAMES[denomSymbol]}`;
 
-            const trace = {
+            const traces = [];
+
+            // Main price ratio trace
+            traces.push({
                 x: dates,
                 y: ratios,
                 type: 'scatter',
@@ -319,7 +369,79 @@
                 fill: 'tozeroy',
                 fillcolor: 'rgba(102, 126, 234, 0.1)',
                 hovertemplate: 'Date: %{x|%Y-%m-%d}<br>Ratio: %{y:.4f}<extra></extra>'
-            };
+            });
+
+            // Add power law fit if available and not normalized
+            if (powerLawFit && !normalize && !isNaN(powerLawFit.drift_annual)) {
+                // Calculate fitted line from parameters
+                // Model: R(t) = R(0) * exp(μ*t)
+                // In log space: log(R(t)) = log(R0) + μ*t
+                // Parallel bands: exp(log(R_fit) ± residual_std)
+
+                const startDate = new Date(powerLawFit.start_date);
+                const mu = powerLawFit.drift_annual;
+                const residualStd = powerLawFit.residual_std;  // Standard deviation in log space
+                const R0 = powerLawFit.initial_value;
+                const logR0 = Math.log(R0);
+
+                const fitDates = [];
+                const fittedLine = [];
+                const upperBand = [];
+                const lowerBand = [];
+
+                // Calculate for each date in the aligned data
+                aligned.dates.forEach(dateStr => {
+                    const date = new Date(dateStr);
+                    const t = (date - startDate) / (1000 * 60 * 60 * 24 * 365.25);  // years
+
+                    if (t >= 0) {  // Only plot for dates >= start_date
+                        const logR_fit = logR0 + mu * t;
+
+                        fitDates.push(date);
+                        fittedLine.push(Math.exp(logR_fit));
+                        // Constant parallel channel in log space
+                        upperBand.push(Math.exp(logR_fit + residualStd));
+                        lowerBand.push(Math.exp(logR_fit - residualStd));
+                    }
+                });
+
+                if (fitDates.length > 0) {
+                    // Upper volatility band
+                    traces.push({
+                        x: fitDates,
+                        y: upperBand,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: '+1σ',
+                        line: { color: 'rgba(246, 173, 85, 0.3)', width: 1, dash: 'dot' },
+                        showlegend: true,
+                        hovertemplate: 'Date: %{x|%Y-%m-%d}<br>+1σ: %{y:.4f}<extra></extra>'
+                    });
+
+                    // Fitted trend line
+                    traces.push({
+                        x: fitDates,
+                        y: fittedLine,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: 'Power Law Fit (μ)',
+                        line: { color: '#f6ad55', width: 2, dash: 'dash' },
+                        hovertemplate: 'Date: %{x|%Y-%m-%d}<br>Fit: %{y:.4f}<extra></extra>'
+                    });
+
+                    // Lower volatility band
+                    traces.push({
+                        x: fitDates,
+                        y: lowerBand,
+                        type: 'scatter',
+                        mode: 'lines',
+                        name: '-1σ',
+                        line: { color: 'rgba(246, 173, 85, 0.3)', width: 1, dash: 'dot' },
+                        showlegend: true,
+                        hovertemplate: 'Date: %{x|%Y-%m-%d}<br>-1σ: %{y:.4f}<extra></extra>'
+                    });
+                }
+            }
 
             const yAxisTitle = normalize ?
                 `${pairName} (Base 100)` :
@@ -368,7 +490,7 @@
             };
 
             document.getElementById('pairChartContainer').style.display = 'block';
-            Plotly.newPlot('pairChart', [trace], layout, config);
+            Plotly.newPlot('pairChart', traces, layout, config);
         }
 
         // ============================================================================
@@ -404,6 +526,11 @@
                 const data1 = await loadMarketData(numSymbol);
                 const data2 = await loadMarketData(denomSymbol);
 
+                // Load power law fits
+                const fits = await loadPowerLawFits();
+                const pairKey = `${numSymbol}/${denomSymbol}`;
+                const powerLawFit = fits ? fits[pairKey] : null;
+
                 // Align data by common dates
                 const aligned = alignDataByDate(data1, data2);
 
@@ -418,8 +545,8 @@
                 const stats = calculateStatistics(ratios);
 
                 // Update display
-                updateStats(stats, numSymbol, denomSymbol, normalize);
-                plotPairChart(aligned, ratios, numSymbol, denomSymbol, scale, normalize);
+                updateStats(stats, numSymbol, denomSymbol, normalize, powerLawFit);
+                plotPairChart(aligned, ratios, numSymbol, denomSymbol, scale, normalize, powerLawFit);
 
                 hideLoading();
 
