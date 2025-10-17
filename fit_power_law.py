@@ -129,9 +129,10 @@ def fit_power_law(ratio_data, dates):
     # This is the typical deviation from the fitted power law
     residual_std = np.std(residuals)
 
-    # Estimate annualized volatility
-    # Annualize the daily residual std using sqrt(252 trading days)
-    sigma = residual_std * np.sqrt(252)
+    # The residual_std is already the volatility we want
+    # It's the standard deviation of log returns around the trend
+    # No need to annualize since we're fitting against time in years
+    sigma = residual_std
 
     # Growth rate is already annualized from regression
     mu = slope
