@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantNetX - Market Pairs</title>
+    <link rel="icon" type="image/png" href="assets/quantnetx_minilogo.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-title">
+                <img src="assets/quantnetx_minilogo.png" alt="QuantNetX" class="minilogo">
+                <h1>QuantNetX</h1>
+            </div>
+            <p class="subtitle">Market Pairs Analysis</p>
+        </header>
+
+        <nav class="nav-bar">
+            <a href="index.html" class="nav-link">Options Analysis</a>
+            <a href="bitcoin_risk.html" class="nav-link">Bitcoin Risk Metric</a>
+            <a href="market_pairs.html" class="nav-link active">Market Pairs</a>
+        </nav>
+
+        <div class="info-box">
+            <strong>Market Pairs Analysis:</strong> Compare relative performance between different assets.
+            Select two symbols to create a trading pair ratio chart (e.g., BTC/Gold, SP500/NASDAQ).
+            The chart shows the ratio of the first asset divided by the second asset over time.
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="numeratorSelect">Numerator</label>
+                <select id="numeratorSelect">
+                    <option value="">Select asset...</option>
+                    <option value="btc">Bitcoin (BTC)</option>
+                    <option value="sp500">S&P 500</option>
+                    <option value="nasdaq">NASDAQ</option>
+                    <option value="gold">Gold</option>
+                    <option value="copper">Copper</option>
+                    <option value="oil">Oil (WTI)</option>
+                    <option value="tlt">TLT (20Y Treasury)</option>
+                    <option value="usd" selected>USD (Cash)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="denominatorSelect">Denominator</label>
+                <select id="denominatorSelect">
+                    <option value="">Select asset...</option>
+                    <option value="btc">Bitcoin (BTC)</option>
+                    <option value="sp500">S&P 500</option>
+                    <option value="nasdaq">NASDAQ</option>
+                    <option value="gold">Gold</option>
+                    <option value="copper">Copper</option>
+                    <option value="oil">Oil (WTI)</option>
+                    <option value="tlt">TLT (20Y Treasury)</option>
+                    <option value="usd" selected>USD (Cash)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="scaleSelect">Scale</label>
+                <select id="scaleSelect">
+                    <option value="linear">Linear</option>
+                    <option value="log" selected>Logarithmic</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="normalizeCheck">
+                    <input type="checkbox" id="normalizeCheck"> Normalize to 100
+                </label>
+            </div>
+        </div>
+
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="loading" class="loading" style="display: none;">Loading data...</div>
+        <div id="stats" class="stats-grid" style="display: none;"></div>
+
+        <div class="chart-container" id="pairChartContainer" style="display: none;">
+            <div id="pairChart" style="width: 100%; height: 600px;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Market data cache
+        const marketData = {};
+        const SYMBOL_NAMES = {
+            'btc': 'Bitcoin',
+            'sp500': 'S&P 500',
+            'nasdaq': 'NASDAQ',
+            'gold': 'Gold',
+            'copper': 'Copper',
+            'oil': 'Oil (WTI)',
+            'tlt': 'TLT',
+            'usd': 'USD'
+        };
+
+        // ============================================================================
+        // Utility Functions
+        // ============================================================================
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function formatNumber(num, decimals = 2) {
+            if (!num || num === '' || isNaN(num)) return '-';
+            return parseFloat(num).toLocaleString('en-US', {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+        }
+
+        // ============================================================================
+        // Data Loading
+        // ============================================================================
+
+        async function loadMarketData(symbol) {
+            // Return cached data if available
+            if (marketData[symbol]) {
+                return marketData[symbol];
+            }
+
+            // USD is always 1.0
+            if (symbol === 'usd') {
+                marketData['usd'] = { constant: true, value: 1.0 };
+                return marketData['usd'];
+            }
+
+            try {
+                const response = await fetch(`../data/market_data/${symbol}_1d.csv`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load ${symbol} data: HTTP ${response.status}`);
+                }
+
+                const csvText = await response.text();
+                const lines = csvText.trim().split('\n');
+                const headers = lines[0].split(',');
+
+                const data = {
+                    dates: [],
+                    timestamps: [],
+                    open: [],
+                    high: [],
+                    low: [],
+                    close: [],
+                    volume: []
+                };
+
+                // Parse CSV data
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    if (values.length >= 7) {
+                        data.dates.push(values[0]);
+                        data.timestamps.push(parseInt(values[1]));
+                        data.open.push(parseFloat(values[2]));
+                        data.high.push(parseFloat(values[3]));
+                        data.low.push(parseFloat(values[4]));
+                        data.close.push(parseFloat(values[5]));
+                        data.volume.push(parseFloat(values[6]));
+                    }
+                }
+
+                marketData[symbol] = data;
+                return data;
+
+            } catch (error) {
+                console.error(`Error loading ${symbol} data from ../data/market_data/${symbol}_1d.csv:`, error);
+                throw new Error(`Failed to load ${symbol}: ${error.message}`);
+            }
+        }
+
+        // ============================================================================
+        // Data Processing
+        // ============================================================================
+
+        function alignDataByDate(data1, data2) {
+            // For USD constant value
+            if (data1.constant) {
+                return {
+                    dates: data2.dates,
+                    timestamps: data2.timestamps,
+                    values1: Array(data2.dates.length).fill(1.0),
+                    values2: data2.close
+                };
+            }
+            if (data2.constant) {
+                return {
+                    dates: data1.dates,
+                    timestamps: data1.timestamps,
+                    values1: data1.close,
+                    values2: Array(data1.dates.length).fill(1.0)
+                };
+            }
+
+            // Find common dates
+            const dates1Set = new Set(data1.dates);
+            const dates2Map = {};
+
+            data2.dates.forEach((date, i) => {
+                dates2Map[date] = i;
+            });
+
+            const aligned = {
+                dates: [],
+                timestamps: [],
+                values1: [],
+                values2: []
+            };
+
+            data1.dates.forEach((date, i) => {
+                if (dates2Map.hasOwnProperty(date)) {
+                    const j = dates2Map[date];
+                    aligned.dates.push(date);
+                    aligned.timestamps.push(data1.timestamps[i]);
+                    aligned.values1.push(data1.close[i]);
+                    aligned.values2.push(data2.close[j]);
+                }
+            });
+
+            return aligned;
+        }
+
+        function calculatePairRatio(aligned, normalize = false) {
+            const ratios = aligned.values1.map((v1, i) => v1 / aligned.values2[i]);
+
+            if (normalize && ratios.length > 0) {
+                const firstRatio = ratios[0];
+                return ratios.map(r => (r / firstRatio) * 100);
+            }
+
+            return ratios;
+        }
+
+        function calculateStatistics(ratios) {
+            if (ratios.length === 0) return null;
+
+            const current = ratios[ratios.length - 1];
+            const start = ratios[0];
+            const change = ((current - start) / start) * 100;
+            const max = Math.max(...ratios);
+            const min = Math.min(...ratios);
+            const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+
+            return { current, start, change, max, min, mean };
+        }
+
+        // ============================================================================
+        // Visualization
+        // ============================================================================
+
+        function updateStats(stats, numSymbol, denomSymbol, normalize) {
+            const statsDiv = document.getElementById('stats');
+
+            const pairName = normalize ?
+                `${SYMBOL_NAMES[numSymbol]}/${SYMBOL_NAMES[denomSymbol]} (Normalized)` :
+                `${SYMBOL_NAMES[numSymbol]}/${SYMBOL_NAMES[denomSymbol]}`;
+
+            const html = `
+                <div class="stat-card">
+                    <div class="stat-label">Pair</div>
+                    <div class="stat-value" style="font-size: 1.1em;">${pairName}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Current Value</div>
+                    <div class="stat-value">${formatNumber(stats.current, 4)}</div>
+                </div>
+                <div class="stat-card" style="border-left: 3px solid ${stats.change >= 0 ? '#48bb78' : '#f56565'};">
+                    <div class="stat-label">Change</div>
+                    <div class="stat-value" style="color: ${stats.change >= 0 ? '#48bb78' : '#f56565'};">
+                        ${stats.change >= 0 ? '+' : ''}${formatNumber(stats.change, 2)}%
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Average</div>
+                    <div class="stat-value">${formatNumber(stats.mean, 4)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Maximum</div>
+                    <div class="stat-value">${formatNumber(stats.max, 4)}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Minimum</div>
+                    <div class="stat-value">${formatNumber(stats.min, 4)}</div>
+                </div>
+            `;
+
+            statsDiv.innerHTML = html;
+            statsDiv.style.display = 'grid';
+        }
+
+        function plotPairChart(aligned, ratios, numSymbol, denomSymbol, scale, normalize) {
+            const dates = aligned.dates.map(d => new Date(d));
+
+            const pairName = `${SYMBOL_NAMES[numSymbol]}/${SYMBOL_NAMES[denomSymbol]}`;
+
+            const trace = {
+                x: dates,
+                y: ratios,
+                type: 'scatter',
+                mode: 'lines',
+                name: pairName,
+                line: { color: '#667eea', width: 2 },
+                fill: 'tozeroy',
+                fillcolor: 'rgba(102, 126, 234, 0.1)',
+                hovertemplate: 'Date: %{x|%Y-%m-%d}<br>Ratio: %{y:.4f}<extra></extra>'
+            };
+
+            const yAxisTitle = normalize ?
+                `${pairName} (Base 100)` :
+                `${pairName} Ratio`;
+
+            const layout = {
+                title: {
+                    text: normalize ?
+                        `${pairName} - Normalized to 100` :
+                        `${pairName} - Price Ratio`,
+                    font: { color: '#e4e4e4', size: 20 }
+                },
+                xaxis: {
+                    title: 'Date',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)'
+                },
+                yaxis: {
+                    title: yAxisTitle,
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    type: scale
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: {
+                    orientation: 'h',
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: -0.15,
+                    yanchor: 'top',
+                    bgcolor: 'rgba(0, 0, 0, 0.7)',
+                    bordercolor: 'rgba(255, 255, 255, 0.2)',
+                    borderwidth: 1
+                },
+                margin: { b: 100 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            document.getElementById('pairChartContainer').style.display = 'block';
+            Plotly.newPlot('pairChart', [trace], layout, config);
+        }
+
+        // ============================================================================
+        // Main Update Function
+        // ============================================================================
+
+        async function updatePairChart() {
+            const numSymbol = document.getElementById('numeratorSelect').value;
+            const denomSymbol = document.getElementById('denominatorSelect').value;
+            const scale = document.getElementById('scaleSelect').value;
+            const normalize = document.getElementById('normalizeCheck').checked;
+
+            // Validate selection
+            if (!numSymbol || !denomSymbol) {
+                document.getElementById('pairChartContainer').style.display = 'none';
+                document.getElementById('stats').style.display = 'none';
+                hideError();
+                return;
+            }
+
+            if (numSymbol === denomSymbol) {
+                showError('Please select two different assets');
+                document.getElementById('pairChartContainer').style.display = 'none';
+                document.getElementById('stats').style.display = 'none';
+                return;
+            }
+
+            try {
+                hideError();
+                showLoading();
+
+                // Load data for both symbols
+                const data1 = await loadMarketData(numSymbol);
+                const data2 = await loadMarketData(denomSymbol);
+
+                // Align data by common dates
+                const aligned = alignDataByDate(data1, data2);
+
+                if (aligned.dates.length === 0) {
+                    throw new Error('No overlapping dates found between selected assets');
+                }
+
+                // Calculate pair ratio
+                const ratios = calculatePairRatio(aligned, normalize);
+
+                // Calculate statistics
+                const stats = calculateStatistics(ratios);
+
+                // Update display
+                updateStats(stats, numSymbol, denomSymbol, normalize);
+                plotPairChart(aligned, ratios, numSymbol, denomSymbol, scale, normalize);
+
+                hideLoading();
+
+            } catch (error) {
+                console.error('Error updating pair chart:', error);
+                showError('Error loading data: ' + error.message);
+                document.getElementById('pairChartContainer').style.display = 'none';
+                document.getElementById('stats').style.display = 'none';
+                hideLoading();
+            }
+        }
+
+        // ============================================================================
+        // Event Listeners
+        // ============================================================================
+
+        document.getElementById('numeratorSelect').addEventListener('change', updatePairChart);
+        document.getElementById('denominatorSelect').addEventListener('change', updatePairChart);
+        document.getElementById('scaleSelect').addEventListener('change', updatePairChart);
+        document.getElementById('normalizeCheck').addEventListener('change', updatePairChart);
+
+        // ============================================================================
+        // Initialization
+        // ============================================================================
+
+        // Set default selection and load initial chart
+        window.addEventListener('load', () => {
+            // Default: BTC/USD
+            document.getElementById('numeratorSelect').value = 'btc';
+            document.getElementById('denominatorSelect').value = 'usd';
+            updatePairChart();
+        });
+    </script>
+</body>
+</html>
