@@ -99,8 +99,9 @@
             <h3 style="color: #e4e4e4; margin-bottom: 15px;">Calendar Spread Forward Volatility Analysis</h3>
             <div class="info-box" style="margin-bottom: 15px;">
                 This shows the forward implied volatility between two expiry dates, useful for trading calendar spreads.
-                Forward IV = sqrt((T2×IV2² - T1×IV1²) / (T2 - T1)), where T is time to expiry in years.
-                If Forward IV > IV1, the market expects higher volatility in the forward period.
+                <br><strong>Forward IV</strong> = sqrt((T2×IV2² - T1×IV1²) / (T2 - T1)), where T is time to expiry in years.
+                <br><strong>Forward Factor (FF)</strong> = (FrontIV - ForwardIV) / ForwardIV - measures the relative difference between front month and forward volatility.
+                <br>FF > 0: Front month IV higher than forward period (backwardation). FF < 0: Forward period IV higher (contango).
             </div>
             <div style="margin-bottom: 20px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
                 <div class="control-group">
@@ -614,9 +615,14 @@
                     // Negative indicates term structure inversion
                     const forwardVol = Math.sqrt(Math.abs(forwardVariance)) * 100 * Math.sign(forwardVariance);
 
+                    // Calculate Forward Factor: FF = (FrontIV - ForwardIV) / ForwardIV
+                    // FrontIV is IV1 (near expiry), ForwardIV is the calculated forward vol
+                    const forwardFactor = forwardVol !== 0 ? (opt1.mark_iv - forwardVol) / forwardVol : 0;
+
                     forwardVols.push({
                         strike: strike,
                         forwardVol: forwardVol,
+                        forwardFactor: forwardFactor,
                         iv1: opt1.mark_iv,
                         iv2: opt2.mark_iv,
                         t1: t1,
@@ -1327,9 +1333,11 @@
                     name: 'Call Forward IV',
                     line: { color: '#667eea', width: 3 },
                     marker: { size: 6, color: '#667eea' },
+                    customdata: callForwardVols.map(v => v.forwardFactor),
                     hovertemplate: '<b>Call Forward IV</b><br>' +
                                    'Strike: $%{x:,.0f}<br>' +
                                    'Forward IV: %{y:.2f}%<br>' +
+                                   'Forward Factor: %{customdata:.3f}<br>' +
                                    '<extra></extra>'
                 });
 
@@ -1355,6 +1363,18 @@
                     opacity: 0.5,
                     hovertemplate: 'Strike: $%{x:,.0f}<br>IV: %{y:.2f}%<extra></extra>'
                 });
+
+                // Add Forward Factor for calls
+                traces.push({
+                    x: callForwardVols.map(v => v.strike),
+                    y: callForwardVols.map(v => v.forwardFactor * 100), // Convert to percentage
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Call Forward Factor (%)',
+                    line: { color: '#48bb78', width: 2 },
+                    yaxis: 'y2',
+                    hovertemplate: 'Strike: $%{x:,.0f}<br>FF: %{y:.2f}%<extra></extra>'
+                });
             }
 
             if (putForwardVols && putForwardVols.length > 0) {
@@ -1366,9 +1386,11 @@
                     name: 'Put Forward IV',
                     line: { color: '#ff6b9d', width: 3 },
                     marker: { size: 6, color: '#ff6b9d', symbol: 'square' },
+                    customdata: putForwardVols.map(v => v.forwardFactor),
                     hovertemplate: '<b>Put Forward IV</b><br>' +
                                    'Strike: $%{x:,.0f}<br>' +
                                    'Forward IV: %{y:.2f}%<br>' +
+                                   'Forward Factor: %{customdata:.3f}<br>' +
                                    '<extra></extra>'
                 });
 
@@ -1394,6 +1416,18 @@
                     opacity: 0.5,
                     hovertemplate: 'Strike: $%{x:,.0f}<br>IV: %{y:.2f}%<extra></extra>'
                 });
+
+                // Add Forward Factor for puts
+                traces.push({
+                    x: putForwardVols.map(v => v.strike),
+                    y: putForwardVols.map(v => v.forwardFactor * 100), // Convert to percentage
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: 'Put Forward Factor (%)',
+                    line: { color: '#f6ad55', width: 2 },
+                    yaxis: 'y2',
+                    hovertemplate: 'Strike: $%{x:,.0f}<br>FF: %{y:.2f}%<extra></extra>'
+                });
             }
 
             const layout = {
@@ -1413,16 +1447,32 @@
                     gridcolor: 'rgba(255, 255, 255, 0.1)',
                     tickformat: '.1f'
                 },
+                yaxis2: {
+                    title: {
+                        text: 'Forward Factor (%)',
+                        font: { color: '#48bb78' }
+                    },
+                    color: '#48bb78',
+                    overlaying: 'y',
+                    side: 'right',
+                    showgrid: false,
+                    tickformat: '.1f',
+                    zeroline: true,
+                    zerolinecolor: 'rgba(72, 187, 120, 0.5)',
+                    zerolinewidth: 2
+                },
                 plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
                 paper_bgcolor: 'rgba(0, 0, 0, 0)',
                 font: { color: '#e4e4e4' },
                 hovermode: 'x unified',
                 showlegend: true,
                 legend: {
-                    x: 1,
-                    xanchor: 'right',
-                    y: 1,
-                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    x: 0.5,
+                    xanchor: 'center',
+                    y: -0.2,
+                    yanchor: 'top',
+                    orientation: 'h',
+                    bgcolor: 'rgba(0, 0, 0, 0.7)',
                     bordercolor: 'rgba(255, 255, 255, 0.2)',
                     borderwidth: 1
                 },
