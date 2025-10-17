@@ -94,6 +94,38 @@
         <div class="chart-container" id="contourChartContainer" style="display: none;">
             <div id="contourChart"></div>
         </div>
+
+        <div class="chart-container" id="calendarSpreadContainer">
+            <h3 style="color: #e4e4e4; margin-bottom: 15px;">Calendar Spread Forward Volatility Analysis</h3>
+            <div class="info-box" style="margin-bottom: 15px;">
+                This shows the forward implied volatility between two expiry dates, useful for trading calendar spreads.
+                Forward IV = sqrt((T2×IV2² - T1×IV1²) / (T2 - T1)), where T is time to expiry in years.
+                If Forward IV > IV1, the market expects higher volatility in the forward period.
+            </div>
+            <div style="margin-bottom: 20px; display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
+                <div class="control-group">
+                    <label for="calendarExpiry1">Near Expiry (T1)</label>
+                    <select id="calendarExpiry1">
+                        <option value="">Select expiry...</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="calendarExpiry2">Far Expiry (T2)</label>
+                    <select id="calendarExpiry2">
+                        <option value="">Select expiry...</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="calendarOptionType">Option Type</label>
+                    <select id="calendarOptionType">
+                        <option value="call">Calls</option>
+                        <option value="put">Puts</option>
+                        <option value="both">Both</option>
+                    </select>
+                </div>
+            </div>
+            <div id="calendarChart"></div>
+        </div>
     </div>
 
     <script>
@@ -528,6 +560,72 @@
             }
 
             return derivatives;
+        }
+
+        // ============================================================================
+        // Calendar Spread Forward Volatility Functions
+        // ============================================================================
+
+        // Calculate forward implied volatility between two expiries
+        function calculateForwardVolatility(options1, options2, optionType = 'call') {
+            // Filter and sort options by type
+            const opts1 = options1
+                .filter(d => d.option_type === (optionType === 'call' ? 'C' : 'P') && d.mark_iv > 0)
+                .sort((a, b) => a.strike - b.strike);
+
+            const opts2 = options2
+                .filter(d => d.option_type === (optionType === 'call' ? 'C' : 'P') && d.mark_iv > 0)
+                .sort((a, b) => a.strike - b.strike);
+
+            if (opts1.length === 0 || opts2.length === 0) {
+                return [];
+            }
+
+            // Get time to expiry in years
+            const now = Date.now();
+            const t1 = (opts1[0].expiration_timestamp - now) / (1000 * 60 * 60 * 24 * 365);
+            const t2 = (opts2[0].expiration_timestamp - now) / (1000 * 60 * 60 * 24 * 365);
+
+            if (t1 <= 0 || t2 <= 0) {
+                return [];
+            }
+
+            // Find common strikes or interpolate
+            const forwardVols = [];
+
+            // For each strike in the first expiry, find corresponding second expiry strike
+            opts1.forEach(opt1 => {
+                const strike = opt1.strike;
+                // Find exact match or closest strike in second expiry
+                const opt2 = opts2.find(o => o.strike === strike) ||
+                             opts2.reduce((prev, curr) =>
+                                 Math.abs(curr.strike - strike) < Math.abs(prev.strike - strike) ? curr : prev
+                             );
+
+                if (opt2 && Math.abs(opt2.strike - strike) < strike * 0.05) { // Within 5% of strike
+                    const iv1 = opt1.mark_iv / 100; // Convert from percentage to decimal
+                    const iv2 = opt2.mark_iv / 100;
+
+                    // Forward variance: Var_forward = (T2*IV2² - T1*IV1²) / (T2 - T1)
+                    // No absolute value - can be negative if term structure is inverted
+                    const forwardVariance = (t2 * iv2 * iv2 - t1 * iv1 * iv1) / (t2 - t1);
+
+                    // Handle both positive and negative forward variance
+                    // Negative indicates term structure inversion
+                    const forwardVol = Math.sqrt(Math.abs(forwardVariance)) * 100 * Math.sign(forwardVariance);
+
+                    forwardVols.push({
+                        strike: strike,
+                        forwardVol: forwardVol,
+                        iv1: opt1.mark_iv,
+                        iv2: opt2.mark_iv,
+                        t1: t1,
+                        t2: t2
+                    });
+                }
+            });
+
+            return forwardVols;
         }
 
         // ============================================================================
@@ -1216,6 +1314,155 @@
             }, 100);
         }
 
+        // Plot calendar spread forward volatility
+        function plotCalendarSpreadVolatility(callForwardVols, putForwardVols, underlyingPrice, expiry1, expiry2) {
+            const traces = [];
+
+            if (callForwardVols && callForwardVols.length > 0) {
+                traces.push({
+                    x: callForwardVols.map(v => v.strike),
+                    y: callForwardVols.map(v => v.forwardVol),
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Call Forward IV',
+                    line: { color: '#667eea', width: 3 },
+                    marker: { size: 6, color: '#667eea' },
+                    hovertemplate: '<b>Call Forward IV</b><br>' +
+                                   'Strike: $%{x:,.0f}<br>' +
+                                   'Forward IV: %{y:.2f}%<br>' +
+                                   '<extra></extra>'
+                });
+
+                // Add near and far IV lines for calls
+                traces.push({
+                    x: callForwardVols.map(v => v.strike),
+                    y: callForwardVols.map(v => v.iv1),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `Call IV (${expiry1})`,
+                    line: { color: '#667eea', width: 1, dash: 'dot' },
+                    opacity: 0.5,
+                    hovertemplate: 'Strike: $%{x:,.0f}<br>IV: %{y:.2f}%<extra></extra>'
+                });
+
+                traces.push({
+                    x: callForwardVols.map(v => v.strike),
+                    y: callForwardVols.map(v => v.iv2),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `Call IV (${expiry2})`,
+                    line: { color: '#667eea', width: 1, dash: 'dash' },
+                    opacity: 0.5,
+                    hovertemplate: 'Strike: $%{x:,.0f}<br>IV: %{y:.2f}%<extra></extra>'
+                });
+            }
+
+            if (putForwardVols && putForwardVols.length > 0) {
+                traces.push({
+                    x: putForwardVols.map(v => v.strike),
+                    y: putForwardVols.map(v => v.forwardVol),
+                    type: 'scatter',
+                    mode: 'lines+markers',
+                    name: 'Put Forward IV',
+                    line: { color: '#ff6b9d', width: 3 },
+                    marker: { size: 6, color: '#ff6b9d', symbol: 'square' },
+                    hovertemplate: '<b>Put Forward IV</b><br>' +
+                                   'Strike: $%{x:,.0f}<br>' +
+                                   'Forward IV: %{y:.2f}%<br>' +
+                                   '<extra></extra>'
+                });
+
+                // Add near and far IV lines for puts
+                traces.push({
+                    x: putForwardVols.map(v => v.strike),
+                    y: putForwardVols.map(v => v.iv1),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `Put IV (${expiry1})`,
+                    line: { color: '#ff6b9d', width: 1, dash: 'dot' },
+                    opacity: 0.5,
+                    hovertemplate: 'Strike: $%{x:,.0f}<br>IV: %{y:.2f}%<extra></extra>'
+                });
+
+                traces.push({
+                    x: putForwardVols.map(v => v.strike),
+                    y: putForwardVols.map(v => v.iv2),
+                    type: 'scatter',
+                    mode: 'lines',
+                    name: `Put IV (${expiry2})`,
+                    line: { color: '#ff6b9d', width: 1, dash: 'dash' },
+                    opacity: 0.5,
+                    hovertemplate: 'Strike: $%{x:,.0f}<br>IV: %{y:.2f}%<extra></extra>'
+                });
+            }
+
+            const layout = {
+                title: {
+                    text: `Forward Implied Volatility: ${expiry1} to ${expiry2}`,
+                    font: { color: '#e4e4e4', size: 20 }
+                },
+                xaxis: {
+                    title: 'Strike Price',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    tickformat: '$,.0f'
+                },
+                yaxis: {
+                    title: 'Implied Volatility (%)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    tickformat: '.1f'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                hovermode: 'x unified',
+                showlegend: true,
+                legend: {
+                    x: 1,
+                    xanchor: 'right',
+                    y: 1,
+                    bgcolor: 'rgba(0, 0, 0, 0.5)',
+                    bordercolor: 'rgba(255, 255, 255, 0.2)',
+                    borderwidth: 1
+                },
+                shapes: [{
+                    type: 'line',
+                    x0: underlyingPrice,
+                    x1: underlyingPrice,
+                    y0: 0,
+                    y1: 1,
+                    yref: 'paper',
+                    line: {
+                        color: '#ffc107',
+                        width: 2,
+                        dash: 'dash'
+                    }
+                }],
+                annotations: [{
+                    x: underlyingPrice,
+                    y: 1,
+                    yref: 'paper',
+                    text: `Current: $${formatNumber(underlyingPrice, 0)}`,
+                    showarrow: false,
+                    font: { color: '#ffc107', size: 12 },
+                    yanchor: 'bottom'
+                }]
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('calendarChart', traces, layout, config);
+
+            setTimeout(() => {
+                Plotly.Plots.resize('calendarChart');
+            }, 100);
+        }
+
         // ============================================================================
         // Event Handlers
         // ============================================================================
@@ -1312,6 +1559,9 @@
                 });
                 availableExpiries = expiries;
 
+                // Update calendar spread expiry dropdowns
+                updateCalendarExpiryOptions();
+
                 // Auto-select first expiry
                 expirySelect.value = expiries[0].expiry;
                 handleExpiryChange();
@@ -1375,6 +1625,147 @@
             }
         });
 
+        // Calendar spread expiry 1 change - recalculate automatically
+        document.getElementById('calendarExpiry1').addEventListener('change', () => {
+            const expiry1 = document.getElementById('calendarExpiry1').value;
+            const expiry2 = document.getElementById('calendarExpiry2').value;
+            if (expiry1 && expiry2) {
+                handleCalendarSpreadCalculation();
+            }
+        });
+
+        // Calendar spread expiry 2 change - recalculate automatically
+        document.getElementById('calendarExpiry2').addEventListener('change', () => {
+            const expiry1 = document.getElementById('calendarExpiry1').value;
+            const expiry2 = document.getElementById('calendarExpiry2').value;
+            if (expiry1 && expiry2) {
+                handleCalendarSpreadCalculation();
+            }
+        });
+
+        // Calendar option type change - recalculate automatically
+        document.getElementById('calendarOptionType').addEventListener('change', () => {
+            const expiry1 = document.getElementById('calendarExpiry1').value;
+            const expiry2 = document.getElementById('calendarExpiry2').value;
+            if (expiry1 && expiry2) {
+                handleCalendarSpreadCalculation();
+            }
+        });
+
+        // Handle calendar spread calculation
+        async function handleCalendarSpreadCalculation() {
+            const expiry1 = document.getElementById('calendarExpiry1').value;
+            const expiry2 = document.getElementById('calendarExpiry2').value;
+            const optionType = document.getElementById('calendarOptionType').value;
+            const currency = document.getElementById('currencySelect').value;
+
+            if (!expiry1 || !expiry2) {
+                showError('Please select both expiry dates');
+                return;
+            }
+
+            hideError();
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                // Fetch option data for both expiries
+                const [options1, options2] = await Promise.all([
+                    fetchOptionChainData(currency, expiry1),
+                    fetchOptionChainData(currency, expiry2)
+                ]);
+
+                if (options1.length === 0 || options2.length === 0) {
+                    throw new Error('No data available for one or both expiries');
+                }
+
+                const underlyingPrice = options1[0].underlying_price;
+
+                // Calculate forward volatilities
+                let callForwardVols = null;
+                let putForwardVols = null;
+
+                if (optionType === 'call' || optionType === 'both') {
+                    callForwardVols = calculateForwardVolatility(options1, options2, 'call');
+                    if (callForwardVols.length === 0) {
+                        console.warn('No valid call forward volatilities calculated');
+                    }
+                }
+
+                if (optionType === 'put' || optionType === 'both') {
+                    putForwardVols = calculateForwardVolatility(options1, options2, 'put');
+                    if (putForwardVols.length === 0) {
+                        console.warn('No valid put forward volatilities calculated');
+                    }
+                }
+
+                if ((!callForwardVols || callForwardVols.length === 0) &&
+                    (!putForwardVols || putForwardVols.length === 0)) {
+                    throw new Error('Unable to calculate forward volatilities (insufficient data)');
+                }
+
+                // Plot the forward volatilities
+                plotCalendarSpreadVolatility(callForwardVols, putForwardVols, underlyingPrice, expiry1, expiry2);
+
+            } catch (error) {
+                showError('Error calculating calendar spread: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // Populate calendar spread expiry dropdowns
+        function updateCalendarExpiryOptions() {
+            const calendarExpiry1 = document.getElementById('calendarExpiry1');
+            const calendarExpiry2 = document.getElementById('calendarExpiry2');
+
+            // Copy expiries from main dropdown
+            if (availableExpiries.length > 0) {
+                calendarExpiry1.innerHTML = '<option value="">Select near expiry...</option>';
+                calendarExpiry2.innerHTML = '<option value="">Select far expiry...</option>';
+
+                availableExpiries.forEach(({ expiry, timestamp }) => {
+                    const option1 = document.createElement('option');
+                    option1.value = expiry;
+                    const daysToExpiry = Math.floor((timestamp - Date.now()) / (1000 * 60 * 60 * 24));
+                    option1.textContent = `${expiry} (${daysToExpiry}d)`;
+                    calendarExpiry1.appendChild(option1);
+
+                    const option2 = document.createElement('option');
+                    option2.value = expiry;
+                    option2.textContent = `${expiry} (${daysToExpiry}d)`;
+                    calendarExpiry2.appendChild(option2);
+                });
+
+                // Auto-select two suitable expiries (not too close to today)
+                // Find expiries that are at least 7 days away
+                const suitableExpiries = availableExpiries.filter(({ timestamp }) => {
+                    const daysToExpiry = (timestamp - Date.now()) / (1000 * 60 * 60 * 24);
+                    return daysToExpiry >= 7;
+                });
+
+                if (suitableExpiries.length >= 2) {
+                    // Select first suitable expiry for near date
+                    calendarExpiry1.value = suitableExpiries[0].expiry;
+
+                    // Select an expiry at least 14 days after the first one for far date
+                    const nearTimestamp = suitableExpiries[0].timestamp;
+                    const farExpiry = suitableExpiries.find(({ timestamp }) =>
+                        (timestamp - nearTimestamp) >= 14 * 24 * 60 * 60 * 1000
+                    );
+
+                    if (farExpiry) {
+                        calendarExpiry2.value = farExpiry.expiry;
+                        // Automatically calculate on load
+                        setTimeout(() => handleCalendarSpreadCalculation(), 500);
+                    } else if (suitableExpiries.length > 1) {
+                        // Fallback: just use the second available expiry
+                        calendarExpiry2.value = suitableExpiries[1].expiry;
+                        setTimeout(() => handleCalendarSpreadCalculation(), 500);
+                    }
+                }
+            }
+        }
+
         // ============================================================================
         // Initialization
         // ============================================================================
@@ -1408,6 +1799,8 @@
             if (document.getElementById('contourChartContainer').style.display !== 'none') {
                 Plotly.Plots.resize('contourChart');
             }
+            // Calendar chart is always visible
+            Plotly.Plots.resize('calendarChart');
         });
     </script>
 </body>
