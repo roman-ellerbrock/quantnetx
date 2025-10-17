@@ -23,6 +23,10 @@
             <a href="bitcoin_risk.html" class="nav-link">Bitcoin Risk Metric</a>
         </nav>
 
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="stats" class="stats-grid" style="display: none;"></div>
+
         <div class="info-box" id="methodInfo">
             <strong>Method:</strong> <span id="methodDescription">Implied probabilities are calculated using the second derivative of option prices (butterfly spread approach).
             The probability density at each strike is computed using finite differences for non-uniformly spaced strikes, then normalized to sum to 1.</span>
@@ -51,13 +55,19 @@
                 </select>
             </div>
             <div class="control-group">
+                <label for="stepSelect">Strike Step Size</label>
+                <select id="stepSelect">
+                    <option value="1">Every Strike (1)</option>
+                    <option value="2">Every 2nd Strike</option>
+                    <option value="3">Every 3rd Strike</option>
+                    <option value="4">Every 4th Strike</option>
+                    <option value="5">Every 5th Strike</option>
+                </select>
+            </div>
+            <div class="control-group">
                 <button id="refreshBtn">Refresh Data</button>
             </div>
         </div>
-
-        <div id="error" class="error" style="display: none;"></div>
-
-        <div id="stats" class="stats-grid" style="display: none;"></div>
 
         <div id="loading" class="loading" style="display: none;">Loading data...</div>
 
@@ -310,7 +320,7 @@
         // ============================================================================
 
         // Calculate probabilities from options using second derivative
-        function calculateProbabilitiesFromOptions(options, underlyingPrice, method = 'finite-diff') {
+        function calculateProbabilitiesFromOptions(options, underlyingPrice, method = 'finite-diff', stepSize = 1) {
             if (options.length < 3) {
                 return [];
             }
@@ -318,15 +328,15 @@
             const probabilities = [];
 
             if (method === 'finite-diff') {
-                // Original finite difference method
-                for (let i = 1; i < options.length - 1; i++) {
-                    const xa = options[i - 1].strike;
+                // Original finite difference method with configurable step size
+                for (let i = stepSize; i < options.length - stepSize; i++) {
+                    const xa = options[i - stepSize].strike;
                     const xb = options[i].strike;
-                    const xc = options[i + 1].strike;
+                    const xc = options[i + stepSize].strike;
 
-                    const fa = options[i - 1].mark_price;
+                    const fa = options[i - stepSize].mark_price;
                     const fb = options[i].mark_price;
-                    const fc = options[i + 1].mark_price;
+                    const fc = options[i + stepSize].mark_price;
 
                     const d1 = xb - xa;
                     const d2 = xc - xb;
@@ -392,7 +402,7 @@
         }
 
         // Calculate implied probability distribution from both calls and puts
-        function calculateImpliedProbability(optionsData, method = 'finite-diff') {
+        function calculateImpliedProbability(optionsData, method = 'finite-diff', stepSize = 1) {
             // Filter and sort calls and puts
             const calls = optionsData
                 .filter(d => d.option_type === 'C' && d.mark_price > 0)
@@ -420,10 +430,10 @@
 
             // Calculate probabilities from calls and puts
             let callProbabilities = calls.length >= 3 ?
-                calculateProbabilitiesFromOptions(calls, underlyingPrice, method) : [];
+                calculateProbabilitiesFromOptions(calls, underlyingPrice, method, stepSize) : [];
 
             let putProbabilities = puts.length >= 3 ?
-                calculateProbabilitiesFromOptions(puts, underlyingPrice, method) : [];
+                calculateProbabilitiesFromOptions(puts, underlyingPrice, method, stepSize) : [];
 
             if (callProbabilities.length === 0 && putProbabilities.length === 0) {
                 throw new Error('No valid probabilities calculated from calls or puts');
@@ -1228,6 +1238,7 @@
             const selectedExpiry = document.getElementById('expirySelect').value;
             const selectedCurrency = document.getElementById('currencySelect').value;
             const selectedMethod = document.getElementById('methodSelect').value;
+            const selectedStepSize = parseInt(document.getElementById('stepSelect').value);
 
             if (!selectedExpiry) {
                 document.getElementById('chartContainer').style.display = 'none';
@@ -1254,8 +1265,8 @@
                     throw new Error('No data available for the selected expiry');
                 }
 
-                // Calculate implied probabilities using selected method
-                const result = calculateImpliedProbability(allData, selectedMethod);
+                // Calculate implied probabilities using selected method and step size
+                const result = calculateImpliedProbability(allData, selectedMethod, selectedStepSize);
 
                 if (result.callProbabilities.length === 0 && result.putProbabilities.length === 0) {
                     throw new Error('Unable to calculate probabilities (insufficient valid data)');
@@ -1332,6 +1343,14 @@
         // Method change - update description and recalculate
         document.getElementById('methodSelect').addEventListener('change', () => {
             updateMethodDescription();
+            const selectedExpiry = document.getElementById('expirySelect').value;
+            if (selectedExpiry) {
+                handleExpiryChange();
+            }
+        });
+
+        // Step size change - recalculate probabilities
+        document.getElementById('stepSelect').addEventListener('change', () => {
             const selectedExpiry = document.getElementById('expirySelect').value;
             if (selectedExpiry) {
                 handleExpiryChange();
