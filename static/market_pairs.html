@@ -87,6 +87,11 @@
         <div class="chart-container" id="pairChartContainer" style="display: none;">
             <div id="pairChart" style="width: 100%; height: 600px;"></div>
         </div>
+
+        <div class="chart-container" id="riskMatrixContainer">
+            <h3 style="color: #e4e4e4; margin-bottom: 15px;">Risk Matrix - Current Valuation of All Pairs</h3>
+            <div id="riskMatrix" style="width: 100%; height: 700px;"></div>
+        </div>
     </div>
 
     <script>
@@ -410,12 +415,12 @@
                                deviation < 0.5 ? 'Fair Value' :
                                deviation < 1 ? 'Slightly Overvalued' :
                                deviation < 2 ? 'Overvalued' : 'Very Overvalued',
-                        color: deviation < -2 ? '#00ff00' :
-                               deviation < -1 ? '#48bb78' :
-                               deviation < -0.5 ? '#68d391' :
-                               deviation < 0.5 ? '#667eea' :
-                               deviation < 1 ? '#f6ad55' :
-                               deviation < 2 ? '#ed8936' : '#f56565'
+                        color: deviation < -2 ? '#7cb342' :
+                               deviation < -1 ? '#9ccc65' :
+                               deviation < -0.5 ? '#c5e1a5' :
+                               deviation < 0.5 ? '#90a4ae' :
+                               deviation < 1 ? '#ffb74d' :
+                               deviation < 2 ? '#ff9800' : '#ef5350'
                     };
                 }
             }
@@ -436,13 +441,13 @@
                         size: 3,
                         color: colorValues,
                         colorscale: [
-                            [0.0, '#00ff00'],   // -2σ: Bright green (very undervalued)
-                            [0.25, '#48bb78'],  // -1σ: Green (undervalued)
-                            [0.375, '#68d391'], // -0.5σ: Light green
-                            [0.5, '#667eea'],   // 0σ: Blue (fair value)
-                            [0.625, '#f6ad55'], // +0.5σ: Orange
-                            [0.75, '#ed8936'],  // +1σ: Dark orange (overvalued)
-                            [1.0, '#f56565']    // +2σ: Red (very overvalued)
+                            [0.0, '#7cb342'],   // -2σ: Muted green (very undervalued)
+                            [0.25, '#9ccc65'],  // -1σ: Light green (undervalued)
+                            [0.375, '#c5e1a5'], // -0.5σ: Pale green
+                            [0.5, '#90a4ae'],   // 0σ: Blue-grey (fair value)
+                            [0.625, '#ffb74d'], // +0.5σ: Soft orange
+                            [0.75, '#ff9800'],  // +1σ: Orange (overvalued)
+                            [1.0, '#ef5350']    // +2σ: Muted red (very overvalued)
                         ],
                         cmin: -2,
                         cmax: 2,
@@ -463,7 +468,7 @@
                         }
                     },
                     line: {
-                        color: 'rgba(102, 126, 234, 0.3)',
+                        color: 'rgba(144, 164, 174, 0.3)',
                         width: 1
                     },
                     hovertemplate: 'Date: %{x|%Y-%m-%d}<br>Ratio: %{y:.4f}<br>Deviation: %{marker.color:.2f}σ<extra></extra>'
@@ -681,11 +686,157 @@
         document.getElementById('normalizeCheck').addEventListener('change', updatePairChart);
 
         // ============================================================================
+        // Risk Matrix
+        // ============================================================================
+
+        async function createRiskMatrix() {
+            const fits = await loadPowerLawFits();
+            if (!fits) {
+                console.warn('No power law fits available for risk matrix');
+                return;
+            }
+
+            const symbols = ['btc', 'sp500', 'nasdaq', 'gold', 'copper', 'oil', 'tlt', 'usd'];
+            const symbolLabels = symbols.map(s => SYMBOL_NAMES[s]);
+
+            // Create matrix of risk values
+            const riskMatrix = [];
+            const textMatrix = [];
+
+            for (let i = 0; i < symbols.length; i++) {
+                const row = [];
+                const textRow = [];
+
+                for (let j = 0; j < symbols.length; j++) {
+                    if (i === j) {
+                        row.push(0);  // Diagonal is always 0 (same asset)
+                        textRow.push('—');
+                    } else {
+                        const pairKey = `${symbols[i]}/${symbols[j]}`;
+                        const fit = fits[pairKey];
+
+                        if (fit && !isNaN(fit.drift_annual) && fit.residual_std) {
+                            // Calculate current risk deviation
+                            // We need the latest price data
+                            const deviation = 0;  // Placeholder, will calculate later
+                            row.push(deviation);
+                            textRow.push(deviation.toFixed(2) + 'σ');
+                        } else {
+                            row.push(null);
+                            textRow.push('N/A');
+                        }
+                    }
+                }
+
+                riskMatrix.push(row);
+                textMatrix.push(textRow);
+            }
+
+            // Calculate actual current risks by loading latest data
+            for (let i = 0; i < symbols.length; i++) {
+                for (let j = 0; j < symbols.length; j++) {
+                    if (i === j) continue;
+
+                    const pairKey = `${symbols[i]}/${symbols[j]}`;
+                    const fit = fits[pairKey];
+
+                    if (fit && !isNaN(fit.drift_annual) && fit.residual_std) {
+                        try {
+                            const data1 = await loadMarketData(symbols[i]);
+                            const data2 = await loadMarketData(symbols[j]);
+                            const aligned = alignDataByDate(data1, data2);
+
+                            if (aligned.dates.length > 0) {
+                                const ratio = aligned.values1[aligned.values1.length - 1] /
+                                             aligned.values2[aligned.values2.length - 1];
+
+                                const lastDate = new Date(aligned.dates[aligned.dates.length - 1]);
+                                const startDate = new Date(fit.start_date);
+                                const t = (lastDate - startDate) / (1000 * 60 * 60 * 24 * 365.25);
+
+                                const logR_fit = Math.log(fit.initial_value) + fit.drift_annual * t;
+                                const logR_actual = Math.log(ratio);
+                                const deviation = (logR_actual - logR_fit) / fit.residual_std;
+
+                                riskMatrix[i][j] = deviation;
+                                textMatrix[i][j] = deviation.toFixed(2) + 'σ';
+                            }
+                        } catch (error) {
+                            console.warn(`Could not calculate risk for ${pairKey}:`, error);
+                        }
+                    }
+                }
+            }
+
+            // Create heatmap
+            const trace = {
+                z: riskMatrix,
+                x: symbolLabels,
+                y: symbolLabels,
+                text: textMatrix,
+                type: 'heatmap',
+                colorscale: [
+                    [0.0, '#7cb342'],   // -2σ: Muted green
+                    [0.25, '#9ccc65'],  // -1σ: Light green
+                    [0.375, '#c5e1a5'], // -0.5σ: Pale green
+                    [0.5, '#90a4ae'],   // 0σ: Blue-grey (fair value)
+                    [0.625, '#ffb74d'], // +0.5σ: Soft orange
+                    [0.75, '#ff9800'],  // +1σ: Orange
+                    [1.0, '#ef5350']    // +2σ: Muted red
+                ],
+                zmin: -2,
+                zmax: 2,
+                hovertemplate: '%{y} / %{x}<br>Risk: %{z:.2f}σ<extra></extra>',
+                showscale: true,
+                colorbar: {
+                    title: 'Risk (σ)',
+                    thickness: 15,
+                    len: 0.7,
+                    tickmode: 'array',
+                    tickvals: [-2, -1, 0, 1, 2],
+                    ticktext: ['-2σ Very Under', '-1σ Under', '0σ Fair', '+1σ Over', '+2σ Very Over']
+                }
+            };
+
+            const layout = {
+                title: {
+                    text: 'Trading Pair Risk Matrix (Current Valuation)',
+                    font: { color: '#e4e4e4', size: 18 }
+                },
+                xaxis: {
+                    title: 'Denominator',
+                    color: '#a0a0a0',
+                    side: 'bottom'
+                },
+                yaxis: {
+                    title: 'Numerator',
+                    color: '#a0a0a0',
+                    autorange: 'reversed'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                margin: { l: 100, r: 100, t: 80, b: 100 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('riskMatrix', [trace], layout, config);
+        }
+
+        // ============================================================================
         // Initialization
         // ============================================================================
 
         // Set default selection and load initial chart
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
+            // Create risk matrix first
+            await createRiskMatrix();
+
             // Default: BTC/USD
             document.getElementById('numeratorSelect').value = 'btc';
             document.getElementById('denominatorSelect').value = 'usd';
