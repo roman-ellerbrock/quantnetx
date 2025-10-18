@@ -19,9 +19,9 @@
         </header>
 
         <nav class="nav-bar">
-            <a href="index.html" class="nav-link">Options Analysis</a>
-            <a href="bitcoin_risk.html" class="nav-link">Bitcoin Risk Metric</a>
             <a href="market_pairs.html" class="nav-link active">Market Pairs</a>
+            <a href="bitcoin_risk.html" class="nav-link">Bitcoin Risk Metric</a>
+            <a href="index.html" class="nav-link">Options Analysis</a>
         </nav>
 
         <div class="info-box">
@@ -540,7 +540,7 @@
             const html = `
                 <div class="stat-card">
                     <div class="stat-label">Pair</div>
-                    <div class="stat-value" style="font-size: 1.1em;">${pairName}</div>
+                    <div class="stat-value">${pairName}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">Current Value</div>
@@ -1645,24 +1645,56 @@
         async function createRiskReturnScatter(symbols, symbolLabels) {
             const metricType = document.getElementById('scatterMetricSelect').value;
 
-            // Update description
-            const descriptionEl = document.getElementById('scatterDescription');
-            if (metricType === 'sharpe') {
-                descriptionEl.textContent = 'Annualized return vs annualized volatility. Color indicates Sharpe ratio (darker green = better risk-adjusted returns).';
-            } else {
-                descriptionEl.textContent = 'Annualized return vs annualized volatility. Color indicates Sortino ratio (darker green = better risk-adjusted returns).';
-            }
-
             // Calculate returns, volatility, and selected ratio for each asset
             const returns = [];
             const volatilities = [];
             const ratioValues = [];
             const labels = [];
+            let bitcoinStats = null;
 
             for (let i = 0; i < symbols.length; i++) {
                 // Skip USD (no return) and CPI
                 if (symbols[i] === 'usd' || symbols[i] === 'cpi') {
                     continue;
+                }
+
+                // Calculate Bitcoin stats but don't add to plot
+                if (symbols[i] === 'btc') {
+                    try {
+                        const data = await loadMarketData(symbols[i]);
+                        if (data.close && data.close.length > 1) {
+                            const assetReturns = calculateReturns(data.close);
+                            let periodsPerYear = 252;
+                            if (data.timestamps && data.timestamps.length > 1) {
+                                const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
+                                                       (data.timestamps.length - 1) / (1000 * 60 * 60 * 24);
+                                if (avgDaysBetween > 25) {
+                                    periodsPerYear = 12;
+                                } else if (avgDaysBetween > 5) {
+                                    periodsPerYear = 52;
+                                }
+                            }
+                            const meanReturn = assetReturns.reduce((a, b) => a + b, 0) / assetReturns.length;
+                            const variance = assetReturns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / assetReturns.length;
+                            const stdDev = Math.sqrt(variance);
+                            const annualizedReturn = meanReturn * periodsPerYear * 100;
+                            const annualizedVolatility = stdDev * Math.sqrt(periodsPerYear) * 100;
+                            let ratio;
+                            if (metricType === 'sharpe') {
+                                ratio = calculateSharpeRatio(assetReturns, periodsPerYear);
+                            } else {
+                                ratio = calculateSortinoRatio(assetReturns, periodsPerYear);
+                            }
+                            bitcoinStats = {
+                                return: annualizedReturn,
+                                volatility: annualizedVolatility,
+                                ratio: ratio
+                            };
+                        }
+                    } catch (error) {
+                        console.warn('Could not calculate Bitcoin metrics:', error);
+                    }
+                    continue;  // Skip adding to plot
                 }
 
                 try {
@@ -1714,6 +1746,20 @@
 
             // Create scatter plot
             const metricName = metricType === 'sharpe' ? 'Sharpe Ratio' : 'Sortino Ratio';
+
+            // Update description with Bitcoin stats if available
+            const descriptionEl = document.getElementById('scatterDescription');
+            let descriptionText = '';
+            if (metricType === 'sharpe') {
+                descriptionText = 'Annualized return vs annualized volatility. Color indicates Sharpe ratio (darker green = better risk-adjusted returns).';
+            } else {
+                descriptionText = 'Annualized return vs annualized volatility. Color indicates Sortino ratio (darker green = better risk-adjusted returns).';
+            }
+
+            if (bitcoinStats) {
+                descriptionText += ` Bitcoin excluded from plot (Return: ${bitcoinStats.return.toFixed(1)}%, Volatility: ${bitcoinStats.volatility.toFixed(1)}%, ${metricName}: ${bitcoinStats.ratio.toFixed(2)}) to maintain readable scale.`;
+            }
+            descriptionEl.textContent = descriptionText;
 
             const trace = {
                 x: volatilities,
