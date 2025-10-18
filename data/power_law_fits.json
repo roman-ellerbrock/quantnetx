@@ -1,6 +1,6 @@
 {
   "metadata": {
-    "generated_at": "2025-10-18 16:08:15",
+    "generated_at": "2025-10-18 16:13:41",
     "total_pairs": 156,
     "description": "Power law (exponential) fits for trading pairs",
     "model": "R(t) = R(0) * exp(\u03bc*t), or log(R(t)) = log(R(0)) + \u03bc*t",
@@ -19,11 +19,17 @@
       "data_points": 3033,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.7617484089805864,
-      "volatility_annual": 1.8853760109507762,
-      "residual_std": 1.8853760109507762,
-      "r_squared": 0.7776188543300464,
-      "initial_value": 0.0006915504586749977
+      "drift_annual": 0.37731593644077727,
+      "volatility_annual": 0.8412349612945049,
+      "residual_std": 0.8412349612945049,
+      "r_squared": 0.9472617412873048,
+      "initial_value": 2.33758752263527e-31,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 3.6555309745065054,
+        "b": -70.53101845849706,
+        "t0": 1262563200.0
+      }
     },
     "btc/nasdaq": {
       "numerator": "btc",
@@ -33,11 +39,17 @@
       "data_points": 3140,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.7273526262585324,
-      "volatility_annual": 1.886647844757228,
-      "residual_std": 1.886647844757228,
-      "r_squared": 0.760984503044804,
-      "initial_value": 0.00035045577870617897
+      "drift_annual": 0.3652571599777522,
+      "volatility_annual": 0.8022796312129807,
+      "residual_std": 0.8022796312129807,
+      "r_squared": 0.9481960322257516,
+      "initial_value": 1.100994776418803e-30,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 3.523642235685521,
+        "b": -68.98133867648917,
+        "t0": 1262563200.0
+      }
     },
     "btc/vti": {
       "numerator": "btc",
@@ -47,11 +59,17 @@
       "data_points": 830,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.764970607581846,
-      "volatility_annual": 1.8793856563621236,
-      "residual_std": 1.8793856563621236,
-      "r_squared": 0.7801690492835544,
-      "initial_value": 0.01322548996042309
+      "drift_annual": 0.46051186640476494,
+      "volatility_annual": 0.8342644339321185,
+      "residual_std": 0.8342644339321185,
+      "r_squared": 0.9484707202046735,
+      "initial_value": 3.200186538949705e-30,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 3.674405265731679,
+        "b": -67.9143436882929,
+        "t0": 1262563200.0
+      }
     },
     "btc/eem": {
       "numerator": "btc",
@@ -61,11 +79,17 @@
       "data_points": 830,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.8656083464836759,
-      "volatility_annual": 1.8979995936421916,
-      "residual_std": 1.8979995936421916,
-      "r_squared": 0.8166975000852243,
-      "initial_value": 0.018175764956828284
+      "drift_annual": 0.5136715130454828,
+      "volatility_annual": 0.9169352409839892,
+      "residual_std": 0.9169352409839892,
+      "r_squared": 0.9498944260010334,
+      "initial_value": 3.11465633613704e-33,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 4.09856390265463,
+        "b": -74.84918924812807,
+        "t0": 1262563200.0
+      }
     },
     "btc/gold": {
       "numerator": "btc",
@@ -75,11 +99,17 @@
       "data_points": 3099,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.8293720483241485,
-      "volatility_annual": 1.9756603480150796,
-      "residual_std": 1.9756603480150796,
-      "r_squared": 0.790575415726682,
-      "initial_value": 0.0006518095542212882
+      "drift_annual": 0.4123613743250137,
+      "volatility_annual": 0.9392611106842892,
+      "residual_std": 0.9392611106842892,
+      "r_squared": 0.9445013332084284,
+      "initial_value": 8.272998116214442e-34,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 3.9778173645218997,
+        "b": -76.17489618929237,
+        "t0": 1262563200.0
+      }
     },
     "btc/silver": {
       "numerator": "btc",
@@ -89,11 +119,17 @@
       "data_points": 830,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.8637581809114376,
-      "volatility_annual": 1.983089730084307,
-      "residual_std": 1.983089730084307,
-      "r_squared": 0.802523309161901,
-      "initial_value": 0.03566102790818473
+      "drift_annual": 0.5172368694642938,
+      "volatility_annual": 0.9847771576963569,
+      "residual_std": 0.9847771576963569,
+      "r_squared": 0.943390069632286,
+      "initial_value": 3.4927739859199055e-33,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 4.127011735067215,
+        "b": -74.73461180993344,
+        "t0": 1262563200.0
+      }
     },
     "btc/palladium": {
       "numerator": "btc",
@@ -103,11 +139,17 @@
       "data_points": 824,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.7952975833302856,
-      "volatility_annual": 1.8342454013084313,
-      "residual_std": 1.8342454013084313,
-      "r_squared": 0.8010761050494518,
-      "initial_value": 0.001346518591643289
+      "drift_annual": 0.4723706593432537,
+      "volatility_annual": 0.8987088625056081,
+      "residual_std": 0.8987088625056081,
+      "r_squared": 0.9440095233816868,
+      "initial_value": 5.27546987858298e-32,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 3.7827671028211887,
+        "b": -72.01965522390579,
+        "t0": 1262563200.0
+      }
     },
     "btc/copper": {
       "numerator": "btc",
@@ -117,11 +159,17 @@
       "data_points": 3123,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.8550295662867196,
-      "volatility_annual": 1.978754975230992,
-      "residual_std": 1.978754975230992,
-      "r_squared": 0.7999851353442676,
-      "initial_value": 0.2504812709436486
+      "drift_annual": 0.42419288720428033,
+      "volatility_annual": 0.9050105467317957,
+      "residual_std": 0.9050105467317957,
+      "r_squared": 0.9510170968441443,
+      "initial_value": 4.316598882162365e-32,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 4.093775549316891,
+        "b": -72.22025517942929,
+        "t0": 1262563200.0
+      }
     },
     "btc/oil": {
       "numerator": "btc",
@@ -131,11 +179,17 @@
       "data_points": 3098,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.8857892372536358,
-      "volatility_annual": 1.9651549729626403,
-      "residual_std": 1.9651549729626403,
-      "r_squared": 0.8131608610936262,
-      "initial_value": 0.009446128326232383
+      "drift_annual": 0.4365629260629547,
+      "volatility_annual": 0.9607774819873659,
+      "residual_std": 0.9607774819873659,
+      "r_squared": 0.9479883590058694,
+      "initial_value": 2.249278857641059e-34,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 4.210876707425601,
+        "b": -77.47728350466988,
+        "t0": 1262563200.0
+      }
     },
     "btc/tlt": {
       "numerator": "btc",
@@ -145,11 +199,17 @@
       "data_points": 3140,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": 0.8697335271111555,
-      "volatility_annual": 1.8196962612518637,
-      "residual_std": 1.8196962612518637,
-      "r_squared": 0.8303203868623599,
-      "initial_value": 0.006352591226314426
+      "drift_annual": 0.4218809177749602,
+      "volatility_annual": 1.0051966932913725,
+      "residual_std": 1.0051966932913725,
+      "r_squared": 0.9395948717835809,
+      "initial_value": 1.935781100682156e-33,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 4.069892621385344,
+        "b": -75.32479715417124,
+        "t0": 1262563200.0
+      }
     },
     "btc/cpi": {
       "numerator": "btc",
@@ -159,11 +219,17 @@
       "data_points": 139,
       "start_date": "2010-02-01",
       "end_date": "2025-08-01",
-      "drift_annual": 0.7792864712864068,
-      "volatility_annual": 1.505341928926668,
-      "residual_std": 1.505341928926668,
-      "r_squared": 0.8431310784959047,
-      "initial_value": 0.00944941984517706
+      "drift_annual": 0.3926574210335015,
+      "volatility_annual": 0.7907671947206678,
+      "residual_std": 0.7907671947206678,
+      "r_squared": 0.9567113958966338,
+      "initial_value": 1.4254459095884048e-31,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 3.8056312105307057,
+        "b": -71.02565319903434,
+        "t0": 1262563200.0
+      }
     },
     "btc/usd": {
       "numerator": "btc",
@@ -173,11 +239,17 @@
       "data_points": 4301,
       "start_date": "2009-10-05",
       "end_date": "2025-10-18",
-      "drift_annual": 0.8698775650964425,
-      "volatility_annual": 1.9013747959569682,
-      "residual_std": 1.9013747959569682,
-      "r_squared": 0.8176873460392398,
-      "initial_value": 0.7337464489823439
+      "drift_annual": 0.41876991127631386,
+      "volatility_annual": 0.9648343283917921,
+      "residual_std": 0.9648343283917921,
+      "r_squared": 0.9450744803143045,
+      "initial_value": 1.0754712834026338e-31,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": 4.108617882440251,
+        "b": -71.30737891414114,
+        "t0": 1262563200.0
+      }
     },
     "sp500/btc": {
       "numerator": "sp500",
@@ -187,11 +259,17 @@
       "data_points": 3033,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.7617484089805863,
-      "volatility_annual": 1.8853760109507762,
-      "residual_std": 1.8853760109507762,
-      "r_squared": 0.7776188543300464,
-      "initial_value": 1446.026081619535
+      "drift_annual": -0.37731593644077727,
+      "volatility_annual": 0.8412349612945049,
+      "residual_std": 0.8412349612945049,
+      "r_squared": 0.9472617412873048,
+      "initial_value": 4.277914689040836e+30,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -3.6555309745065054,
+        "b": 70.53101845849706,
+        "t0": 1262563200.0
+      }
     },
     "sp500/nasdaq": {
       "numerator": "sp500",
@@ -355,11 +433,17 @@
       "data_points": 3140,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.7273526262585324,
-      "volatility_annual": 1.886647844757228,
-      "residual_std": 1.886647844757228,
-      "r_squared": 0.760984503044804,
-      "initial_value": 2853.427053455429
+      "drift_annual": -0.3652571599777528,
+      "volatility_annual": 0.8022796312129806,
+      "residual_std": 0.8022796312129806,
+      "r_squared": 0.9481960322257516,
+      "initial_value": 9.082695226337094e+29,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -3.523642235685527,
+        "b": 68.98133867648929,
+        "t0": 1262563200.0
+      }
     },
     "nasdaq/sp500": {
       "numerator": "nasdaq",
@@ -523,11 +607,17 @@
       "data_points": 830,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.764970607581846,
-      "volatility_annual": 1.8793856563621236,
-      "residual_std": 1.8793856563621236,
-      "r_squared": 0.7801690492835544,
-      "initial_value": 75.61156546883873
+      "drift_annual": -0.4605118664047642,
+      "volatility_annual": 0.8342644339321185,
+      "residual_std": 0.8342644339321185,
+      "r_squared": 0.9484707202046735,
+      "initial_value": 3.1248178436751332e+29,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -3.6744052657316733,
+        "b": 67.9143436882928,
+        "t0": 1262563200.0
+      }
     },
     "vti/sp500": {
       "numerator": "vti",
@@ -691,11 +781,17 @@
       "data_points": 830,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.8656083464836759,
-      "volatility_annual": 1.8979995936421916,
-      "residual_std": 1.8979995936421916,
-      "r_squared": 0.8166975000852243,
-      "initial_value": 55.01831710385974
+      "drift_annual": -0.5136715130454828,
+      "volatility_annual": 0.9169352409839892,
+      "residual_std": 0.9169352409839892,
+      "r_squared": 0.9498944260010334,
+      "initial_value": 3.2106270871612516e+32,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -4.09856390265463,
+        "b": 74.84918924812807,
+        "t0": 1262563200.0
+      }
     },
     "eem/sp500": {
       "numerator": "eem",
@@ -859,11 +955,17 @@
       "data_points": 3099,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.8293720483241485,
-      "volatility_annual": 1.9756603480150796,
-      "residual_std": 1.9756603480150796,
-      "r_squared": 0.790575415726682,
-      "initial_value": 1534.1904602713169
+      "drift_annual": -0.41236137432501396,
+      "volatility_annual": 0.939261110684289,
+      "residual_std": 0.939261110684289,
+      "r_squared": 0.9445013332084284,
+      "initial_value": 1.2087516350815232e+33,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -3.977817364521903,
+        "b": 76.17489618929243,
+        "t0": 1262563200.0
+      }
     },
     "gold/sp500": {
       "numerator": "gold",
@@ -1027,11 +1129,17 @@
       "data_points": 830,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.8637581809114376,
-      "volatility_annual": 1.9830897300843071,
-      "residual_std": 1.9830897300843071,
-      "r_squared": 0.8025233091619008,
-      "initial_value": 28.041816477490976
+      "drift_annual": -0.5172368694642938,
+      "volatility_annual": 0.9847771576963569,
+      "residual_std": 0.9847771576963569,
+      "r_squared": 0.943390069632286,
+      "initial_value": 2.8630538478332894e+32,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -4.127011735067215,
+        "b": 74.73461180993344,
+        "t0": 1262563200.0
+      }
     },
     "silver/sp500": {
       "numerator": "silver",
@@ -1195,11 +1303,17 @@
       "data_points": 824,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.7952975833302856,
-      "volatility_annual": 1.8342454013084313,
-      "residual_std": 1.8342454013084313,
-      "r_squared": 0.8010761050494518,
-      "initial_value": 742.6559174200497
+      "drift_annual": -0.4723706593432537,
+      "volatility_annual": 0.8987088625056081,
+      "residual_std": 0.8987088625056081,
+      "r_squared": 0.9440095233816868,
+      "initial_value": 1.8955657467778122e+31,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -3.7827671028211887,
+        "b": 72.01965522390579,
+        "t0": 1262563200.0
+      }
     },
     "palladium/sp500": {
       "numerator": "palladium",
@@ -1363,11 +1477,17 @@
       "data_points": 3123,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.8550295662867196,
-      "volatility_annual": 1.978754975230992,
-      "residual_std": 1.978754975230992,
-      "r_squared": 0.7999851353442676,
-      "initial_value": 3.9923144602095717
+      "drift_annual": -0.42419288720428033,
+      "volatility_annual": 0.9050105467317957,
+      "residual_std": 0.9050105467317957,
+      "r_squared": 0.9510170968441443,
+      "initial_value": 2.3166386947194365e+31,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -4.093775549316891,
+        "b": 72.22025517942929,
+        "t0": 1262563200.0
+      }
     },
     "copper/sp500": {
       "numerator": "copper",
@@ -1531,11 +1651,17 @@
       "data_points": 3098,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.8857892372536358,
-      "volatility_annual": 1.9651549729626403,
-      "residual_std": 1.9651549729626403,
-      "r_squared": 0.8131608610936262,
-      "initial_value": 105.86347818533746
+      "drift_annual": -0.4365629260629547,
+      "volatility_annual": 0.9607774819873657,
+      "residual_std": 0.9607774819873657,
+      "r_squared": 0.9479883590058694,
+      "initial_value": 4.445869379880956e+33,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -4.210876707425601,
+        "b": 77.47728350466988,
+        "t0": 1262563200.0
+      }
     },
     "oil/sp500": {
       "numerator": "oil",
@@ -1699,11 +1825,17 @@
       "data_points": 3140,
       "start_date": "2009-10-05",
       "end_date": "2025-10-17",
-      "drift_annual": -0.8697335271111556,
-      "volatility_annual": 1.8196962612518635,
-      "residual_std": 1.8196962612518635,
-      "r_squared": 0.8303203868623599,
-      "initial_value": 157.41607863224178
+      "drift_annual": -0.4218809177749602,
+      "volatility_annual": 1.0051966932913725,
+      "residual_std": 1.0051966932913725,
+      "r_squared": 0.9395948717835809,
+      "initial_value": 5.165873350285354e+32,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -4.069892621385344,
+        "b": 75.32479715417124,
+        "t0": 1262563200.0
+      }
     },
     "tlt/sp500": {
       "numerator": "tlt",
@@ -1867,11 +1999,17 @@
       "data_points": 139,
       "start_date": "2010-02-01",
       "end_date": "2025-08-01",
-      "drift_annual": -0.7792864712864069,
-      "volatility_annual": 1.505341928926668,
-      "residual_std": 1.505341928926668,
-      "r_squared": 0.8431310784959047,
-      "initial_value": 105.82660273163704
+      "drift_annual": -0.39265742103350104,
+      "volatility_annual": 0.7907671947206676,
+      "residual_std": 0.7907671947206676,
+      "r_squared": 0.9567113958966339,
+      "initial_value": 7.01534862370655e+30,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -3.8056312105307013,
+        "b": 71.02565319903425,
+        "t0": 1262563200.0
+      }
     },
     "cpi/sp500": {
       "numerator": "cpi",
@@ -2035,11 +2173,17 @@
       "data_points": 4301,
       "start_date": "2009-10-05",
       "end_date": "2025-10-18",
-      "drift_annual": -0.8698775650964425,
-      "volatility_annual": 1.9013747959569682,
-      "residual_std": 1.9013747959569682,
-      "r_squared": 0.8176873460392398,
-      "initial_value": 1.3628686058882216
+      "drift_annual": -0.41876991127631386,
+      "volatility_annual": 0.9648343283917921,
+      "residual_std": 0.9648343283917921,
+      "r_squared": 0.9450744803143045,
+      "initial_value": 9.298249199515084e+30,
+      "btc_model": "logarithmic",
+      "btc_params": {
+        "a": -4.108617882440251,
+        "b": 71.30737891414114,
+        "t0": 1262563200.0
+      }
     },
     "usd/sp500": {
       "numerator": "usd",

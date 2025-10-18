@@ -27,6 +27,10 @@ from scipy import stats
 DATA_DIR = 'data/market_data'
 OUTPUT_FILE = 'data/power_law_fits.json'
 
+# Load Bitcoin risk data (logarithmic model)
+BITCOIN_RISK_FILE = 'data/bitcoin_risk_data.json'
+bitcoin_risk_data = None
+
 SYMBOLS = ['btc', 'sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'cpi']
 SYMBOL_NAMES = {
     'btc': 'Bitcoin',
@@ -262,6 +266,120 @@ def fit_power_law(ratio_data, dates):
         'initial_value': float(np.exp(intercept))
     }
 
+def load_bitcoin_risk_data():
+    """Load Bitcoin risk data with logarithmic model."""
+    global bitcoin_risk_data
+    if bitcoin_risk_data is not None:
+        return bitcoin_risk_data
+
+    try:
+        with open(BITCOIN_RISK_FILE, 'r') as f:
+            bitcoin_risk_data = json.load(f)
+        return bitcoin_risk_data
+    except Exception as e:
+        print(f"Warning: Could not load Bitcoin risk data: {e}")
+        return None
+
+def fit_bitcoin_logarithmic_model(ratio_data, dates):
+    """
+    Fit Bitcoin data using logarithmic model: log(P(t)) = a*log(t-t0) + b
+
+    This captures diminishing returns as Bitcoin matures.
+    Uses t0 from the Bitcoin risk model parameters.
+
+    Returns fit parameters compatible with standard power law output.
+    """
+    if bitcoin_risk_data is None:
+        # Fall back to standard power law if risk model not available
+        return fit_power_law(ratio_data, dates)
+
+    # Get t0 (first Bitcoin timestamp) from risk model
+    t0 = bitcoin_risk_data['parameters']['mean']['first_btc']
+
+    # Filter out non-positive ratios
+    valid_mask = ratio_data > 0
+    if np.sum(valid_mask) < 100:
+        raise ValueError("Insufficient positive data points for log transformation")
+
+    ratio_data = ratio_data[valid_mask]
+    dates = [d for d, valid in zip(dates, valid_mask) if valid]
+
+    # Convert dates to Unix timestamps
+    time_unix = np.array([
+        datetime.strptime(d, '%Y-%m-%d').timestamp()
+        for d in dates
+    ])
+
+    # Filter out dates before t0 (need positive values for log)
+    valid_time_mask = time_unix > t0
+    if np.sum(valid_time_mask) < 100:
+        raise ValueError("Insufficient data points after t0")
+
+    time_unix = time_unix[valid_time_mask]
+    ratio_data = ratio_data[valid_time_mask]
+
+    # Calculate log(t - t0) for the logarithmic model
+    log_time = np.log(time_unix - t0)
+    log_ratio = np.log(ratio_data)
+
+    # Calculate weights based on time gaps
+    weights = np.zeros(len(time_unix))
+    for i in range(len(time_unix)):
+        if i == 0:
+            dt = time_unix[1] - time_unix[0] if len(time_unix) > 1 else 86400
+            weights[i] = dt / 2
+        elif i == len(time_unix) - 1:
+            dt = time_unix[i] - time_unix[i-1]
+            weights[i] = dt / 2
+        else:
+            dt_before = time_unix[i] - time_unix[i-1]
+            dt_after = time_unix[i+1] - time_unix[i]
+            weights[i] = (dt_before + dt_after) / 2
+
+    # Normalize weights
+    weights = weights * len(weights) / np.sum(weights)
+
+    # Weighted linear regression: log(P) = a*log(t-t0) + b
+    W = np.diag(weights)
+    X = np.column_stack([np.ones(len(log_time)), log_time])
+    XtWX = X.T @ W @ X
+    XtWy = X.T @ W @ log_ratio
+    params = np.linalg.solve(XtWX, XtWy)
+
+    b = params[0]  # intercept
+    a = params[1]  # slope (log-log)
+
+    # Calculate fitted values and residuals
+    fitted_log_ratio = b + a * log_time
+    residuals = log_ratio - fitted_log_ratio
+
+    # Calculate weighted standard deviation of residuals
+    weighted_residual_var = np.sum(weights * residuals**2) / np.sum(weights)
+    residual_std = np.sqrt(weighted_residual_var)
+
+    # Calculate R-squared
+    ss_res = np.sum(weights * residuals**2)
+    weighted_mean = np.sum(weights * log_ratio) / np.sum(weights)
+    ss_tot = np.sum(weights * (log_ratio - weighted_mean)**2)
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+
+    # Convert to annualized growth rate approximation
+    # For log model, the instantaneous growth rate is: d(log P)/dt = a/(t-t0)
+    # Use average time for approximation
+    avg_time = np.mean(time_unix)
+    seconds_per_year = 365.25 * 24 * 3600
+    mu_approx = a / (avg_time - t0) * seconds_per_year
+
+    return {
+        'mu': float(mu_approx),
+        'sigma': float(residual_std),
+        'residual_std': float(residual_std),
+        'r_squared': float(r_squared),
+        'initial_value': float(np.exp(b)),
+        'btc_model': 'logarithmic',  # Flag to indicate this uses Bitcoin logarithmic model
+        'btc_params': {'a': float(a), 'b': float(b), 't0': float(t0)}  # Store model parameters
+    }
+
 def calculate_pair_ratio(data1, data2):
     """Calculate ratio of two aligned datasets."""
     if data1 is None:  # Numerator is USD
@@ -275,6 +393,15 @@ def main():
     print("=" * 70)
     print("Power Law Fitting for Trading Pairs")
     print("=" * 70)
+    print()
+
+    # Load Bitcoin risk data
+    print("Loading Bitcoin risk model...")
+    btc_risk = load_bitcoin_risk_data()
+    if btc_risk is not None:
+        print("  ✓ Loaded Bitcoin logarithmic model (diminishing returns)")
+    else:
+        print("  ⚠ Bitcoin risk model not available, will use standard power law for all pairs")
     print()
 
     # Load all market data
@@ -322,12 +449,16 @@ def main():
             # Calculate ratio
             ratio = calculate_pair_ratio(aligned1, aligned2)
 
-            # Fit power law
+            # Fit power law or logarithmic model for Bitcoin pairs
             try:
-                fit_result = fit_power_law(ratio, common_dates)
+                # Use logarithmic model for Bitcoin pairs if risk model is available
+                if (num_symbol == 'btc' or denom_symbol == 'btc') and btc_risk is not None:
+                    fit_result = fit_bitcoin_logarithmic_model(ratio, common_dates)
+                else:
+                    fit_result = fit_power_law(ratio, common_dates)
 
                 # Store results
-                all_fits[pair_name] = {
+                result_dict = {
                     'numerator': num_symbol,
                     'denominator': denom_symbol,
                     'numerator_name': SYMBOL_NAMES[num_symbol],
@@ -341,6 +472,13 @@ def main():
                     'r_squared': fit_result['r_squared'],
                     'initial_value': fit_result['initial_value']
                 }
+
+                # Add Bitcoin-specific fields if present
+                if 'btc_model' in fit_result:
+                    result_dict['btc_model'] = fit_result['btc_model']
+                    result_dict['btc_params'] = fit_result['btc_params']
+
+                all_fits[pair_name] = result_dict
 
                 pair_count += 1
 
