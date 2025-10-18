@@ -19,7 +19,19 @@ This document lists all data sources used in QuantNetX and provides proper attri
 Historical data is provided "AS IS" and solely for informational purposes - not for trading purposes or advice. Neither Macrotrends LLC nor any of our information providers will be liable for any damages relating to your use of the data provided.
 
 **Processing:**
-Raw data from Macrotrends is processed using `process_palladium_macrotrends.py` and merged with existing palladium data using `merge_palladium_data.py`. The merged dataset contains 12,365 data points from 1977-01-05 to 2025-10-17.
+Macrotrends data (1977-1997) merged with existing high-quality data (1998-2025). Final dataset: 6,598 data points from 1977-01-05 to 2025-10-17. Note: Macrotrends data from 2024+ excluded due to data quality issues.
+
+---
+
+### Silver Historical Prices
+
+**Source:** Historical silver price data
+**File:** `data/silver_historical.csv`
+**Date Range:** 1915-01-01 to 2025-10-01
+**Data Points:** 1,330
+
+**Processing:**
+Historical data (1915-2000) merged with existing market data (2000-2025). Final dataset: 2,345 data points from 1915-01-01 to 2025-10-17, providing 110 years of silver price history.
 
 ---
 

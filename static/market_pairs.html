@@ -1573,8 +1573,9 @@
                         // Approximate from data timestamps
                         let periodsPerYear = 252; // Default to daily
                         if (data.timestamps && data.timestamps.length > 1) {
+                            // Timestamps are in Unix seconds, not milliseconds
                             const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
-                                                   (data.timestamps.length - 1) / (1000 * 60 * 60 * 24);
+                                                   (data.timestamps.length - 1) / (60 * 60 * 24);
                             if (avgDaysBetween > 25) {
                                 periodsPerYear = 12; // Monthly data
                             } else if (avgDaysBetween > 5) {
@@ -1687,8 +1688,9 @@
                             const assetReturns = calculateReturns(data.close);
                             let periodsPerYear = 252;
                             if (data.timestamps && data.timestamps.length > 1) {
+                                // Timestamps are in Unix seconds, not milliseconds
                                 const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
-                                                       (data.timestamps.length - 1) / (1000 * 60 * 60 * 24);
+                                                       (data.timestamps.length - 1) / (60 * 60 * 24);
                                 if (avgDaysBetween > 25) {
                                     periodsPerYear = 12;
                                 } else if (avgDaysBetween > 5) {
@@ -1727,8 +1729,9 @@
                         // Determine periods per year based on data frequency
                         let periodsPerYear = 252; // Default to daily
                         if (data.timestamps && data.timestamps.length > 1) {
+                            // Timestamps are in Unix seconds, not milliseconds
                             const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
-                                                   (data.timestamps.length - 1) / (1000 * 60 * 60 * 24);
+                                                   (data.timestamps.length - 1) / (60 * 60 * 24);
                             if (avgDaysBetween > 25) {
                                 periodsPerYear = 12; // Monthly data
                             } else if (avgDaysBetween > 5) {
