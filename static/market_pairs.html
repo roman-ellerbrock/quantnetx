@@ -161,6 +161,32 @@
             </p>
             <div id="riskReturnScatter" style="width: 100%; height: 600px;"></div>
         </div>
+
+        <div class="chart-container" id="returnDistributionContainer">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #e4e4e4; margin: 0;">Return Distribution</h3>
+                <div class="control-group" style="margin: 0;">
+                    <label for="distributionAssetSelect" style="margin-right: 10px; color: #a0a0a0;">Asset:</label>
+                    <select id="distributionAssetSelect" style="padding: 5px 10px; background: rgba(255, 255, 255, 0.1); color: #e4e4e4; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px;">
+                        <option value="btc">Bitcoin</option>
+                        <option value="sp500" selected>S&P 500</option>
+                        <option value="nasdaq">NASDAQ</option>
+                        <option value="vti">VTI</option>
+                        <option value="eem">EEM</option>
+                        <option value="gold">Gold</option>
+                        <option value="silver">Silver</option>
+                        <option value="palladium">Palladium</option>
+                        <option value="copper">Copper</option>
+                        <option value="oil">Oil (WTI)</option>
+                        <option value="tlt">TLT</option>
+                    </select>
+                </div>
+            </div>
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: 0; margin-bottom: 15px;" id="distributionDescription">
+                Histogram showing probability distribution of weekly returns. All returns normalized to 7-day periods for comparability across assets with different data frequencies.
+            </p>
+            <div id="returnDistributionChart" style="width: 100%; height: 500px;"></div>
+        </div>
     </div>
 
     <script>
@@ -1843,6 +1869,167 @@
         }
 
         // ============================================================================
+        // Return Distribution
+        // ============================================================================
+
+        async function createReturnDistribution() {
+            const symbol = document.getElementById('distributionAssetSelect').value;
+
+            try {
+                const data = await loadMarketData(symbol);
+
+                if (!data.close || data.close.length < 2) {
+                    console.warn(`Not enough data for ${symbol}`);
+                    return;
+                }
+
+                // Calculate weekly returns (normalized to 7-day periods)
+                const returns = [];
+
+                // First, determine if we have timestamps to work with
+                if (!data.timestamps || data.timestamps.length === 0) {
+                    console.warn(`${symbol}: No timestamp data available`);
+                    return;
+                }
+
+                // Strategy: Sample data points that are approximately 7 days apart
+                const WEEK_SECONDS = 7 * 24 * 60 * 60;  // 7 days in seconds
+                const TOLERANCE = 3 * 24 * 60 * 60;  // ±3 days tolerance (in seconds)
+
+                let lastSampleTime = data.timestamps[0];
+                let lastSamplePrice = data.close[0];
+
+                for (let i = 1; i < data.timestamps.length; i++) {
+                    const currentTime = data.timestamps[i];
+                    const timeDiff = currentTime - lastSampleTime;  // Difference in seconds
+
+                    // Check if we're approximately a week away (7 days ± 3 days tolerance)
+                    if (timeDiff >= WEEK_SECONDS - TOLERANCE && timeDiff <= WEEK_SECONDS + TOLERANCE) {
+                        // Calculate weekly log return
+                        if (data.close[i] > 0 && lastSamplePrice > 0) {
+                            const weeklyReturn = Math.log(data.close[i] / lastSamplePrice);
+                            returns.push(weeklyReturn * 100); // Convert to percentage
+                        }
+
+                        // Update last sample
+                        lastSampleTime = currentTime;
+                        lastSamplePrice = data.close[i];
+                    } else if (timeDiff > WEEK_SECONDS + TOLERANCE) {
+                        // If we've gone too far past a week, force a sample
+                        // This handles cases where data is sparse
+                        if (data.close[i] > 0 && lastSamplePrice > 0) {
+                            // Normalize the return to weekly equivalent
+                            const actualReturn = Math.log(data.close[i] / lastSamplePrice);
+                            const weeklyNormalized = actualReturn * (WEEK_SECONDS / timeDiff);
+                            returns.push(weeklyNormalized * 100); // Convert to percentage
+                        }
+
+                        // Update last sample
+                        lastSampleTime = currentTime;
+                        lastSamplePrice = data.close[i];
+                    }
+                }
+
+                console.log(`${symbol}: Calculated ${returns.length} weekly returns from ${data.close.length} prices`);
+
+                // Calculate percentiles to focus on main distribution (exclude outliers)
+                const sortedReturns = [...returns].sort((a, b) => a - b);
+                const p1 = sortedReturns[Math.floor(returns.length * 0.01)];   // 1st percentile
+                const p99 = sortedReturns[Math.floor(returns.length * 0.99)];  // 99th percentile
+
+                // Expand range slightly for better visualization
+                const range = p99 - p1;
+                const xMin = p1 - range * 0.1;
+                const xMax = p99 + range * 0.1;
+
+                console.log(`${symbol}: Focusing histogram on range [${xMin.toFixed(2)}%, ${xMax.toFixed(2)}%] (1st-99th percentile)`);
+
+                const totalCount = returns.length;
+
+                // Manually calculate bin counts for hover display
+                const binSize = (xMax - xMin) / 60;
+                const binCounts = new Array(60).fill(0);
+                const binCenters = [];
+
+                // Calculate bin centers
+                for (let i = 0; i < 60; i++) {
+                    binCenters.push(xMin + (i + 0.5) * binSize);
+                }
+
+                // Count returns in each bin
+                returns.forEach(ret => {
+                    const binIndex = Math.floor((ret - xMin) / binSize);
+                    if (binIndex >= 0 && binIndex < 60) {
+                        binCounts[binIndex]++;
+                    }
+                });
+
+                // Create histogram with custom data for proper hover labels
+                const trace = {
+                    x: returns,
+                    type: 'histogram',
+                    name: 'Returns',
+                    histnorm: 'probability',
+                    nbinsx: 60,
+                    xbins: {
+                        start: xMin,
+                        end: xMax,
+                        size: binSize
+                    },
+                    marker: {
+                        color: '#667eea',
+                        line: {
+                            color: 'rgba(255, 255, 255, 0.3)',
+                            width: 1
+                        }
+                    },
+                    customdata: binCounts,
+                    hovertemplate: '<b>Return Range:</b> %{x}%<br>' +
+                                   '<b>Probability:</b> %{y:.4f}<br>' +
+                                   '<b>Count:</b> %{customdata}<br>' +
+                                   '<extra></extra>'
+                };
+
+                const layout = {
+                    title: {
+                        text: `${SYMBOL_NAMES[symbol]} - Return Distribution`,
+                        font: { color: '#e4e4e4', size: 18 }
+                    },
+                    xaxis: {
+                        title: 'Weekly Return (%)',
+                        color: '#a0a0a0',
+                        gridcolor: 'rgba(255, 255, 255, 0.1)',
+                        zeroline: true,
+                        zerolinecolor: 'rgba(255, 255, 255, 0.5)',
+                        zerolinewidth: 2,
+                        range: [xMin, xMax]
+                    },
+                    yaxis: {
+                        title: 'Probability',
+                        color: '#a0a0a0',
+                        gridcolor: 'rgba(255, 255, 255, 0.1)'
+                    },
+                    plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                    paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                    font: { color: '#e4e4e4' },
+                    showlegend: false,
+                    margin: { l: 80, r: 40, t: 80, b: 80 }
+                };
+
+                const config = {
+                    responsive: true,
+                    displayModeBar: true,
+                    displaylogo: false
+                };
+
+                Plotly.newPlot('returnDistributionChart', [trace], layout, config);
+
+            } catch (error) {
+                console.error(`Error creating return distribution for ${symbol}:`, error);
+            }
+        }
+
+        // ============================================================================
         // Initialization
         // ============================================================================
 
@@ -1855,7 +2042,13 @@
             document.getElementById('numeratorSelect').value = 'sp500';
             document.getElementById('denominatorSelect').value = 'usd';
             updatePairChart();
+
+            // Create return distribution
+            createReturnDistribution();
         });
+
+        // Event listener for distribution asset selector
+        document.getElementById('distributionAssetSelect').addEventListener('change', createReturnDistribution);
     </script>
 </body>
 </html>
