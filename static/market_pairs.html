@@ -28,6 +28,7 @@
             <strong>Market Pairs Analysis:</strong> Compare relative performance between different assets.
             Select two symbols to create a trading pair ratio chart (e.g., BTC/Gold, SP500/NASDAQ).
             The chart shows the ratio of the first asset divided by the second asset over time.
+            The page automatically uses the longest available historical data (monthly data for SP500 since 1935, Gold since 1935, Oil since 1961).
             <br><br>
             <strong>Power Law Model:</strong> R(t) = R(0) · exp(μ·t), where μ is the exponential growth rate (annualized).
             The dashed orange line shows the fitted exponential trend with ±1σ parallel bands.
@@ -177,47 +178,57 @@
                 return marketData['usd'];
             }
 
-            try {
-                const response = await fetch(`../data/market_data/${symbol}_1d.csv`);
-                if (!response.ok) {
-                    throw new Error(`Failed to load ${symbol} data: HTTP ${response.status}`);
-                }
+            // Try monthly data first (longer history), then fall back to weekly
+            const intervals = ['1mo', '1wk'];
 
-                const csvText = await response.text();
-                const lines = csvText.trim().split('\n');
-                const headers = lines[0].split(',');
-
-                const data = {
-                    dates: [],
-                    timestamps: [],
-                    open: [],
-                    high: [],
-                    low: [],
-                    close: [],
-                    volume: []
-                };
-
-                // Parse CSV data
-                for (let i = 1; i < lines.length; i++) {
-                    const values = lines[i].split(',');
-                    if (values.length >= 7) {
-                        data.dates.push(values[0]);
-                        data.timestamps.push(parseInt(values[1]));
-                        data.open.push(parseFloat(values[2]));
-                        data.high.push(parseFloat(values[3]));
-                        data.low.push(parseFloat(values[4]));
-                        data.close.push(parseFloat(values[5]));
-                        data.volume.push(parseFloat(values[6]));
+            for (const interval of intervals) {
+                try {
+                    const response = await fetch(`../data/market_data/${symbol}_${interval}.csv`);
+                    if (!response.ok) {
+                        continue; // Try next interval
                     }
+
+                    const csvText = await response.text();
+                    const lines = csvText.trim().split('\n');
+                    const headers = lines[0].split(',');
+
+                    const data = {
+                        dates: [],
+                        timestamps: [],
+                        open: [],
+                        high: [],
+                        low: [],
+                        close: [],
+                        volume: [],
+                        interval: interval  // Store which interval was used
+                    };
+
+                    // Parse CSV data
+                    for (let i = 1; i < lines.length; i++) {
+                        const values = lines[i].split(',');
+                        if (values.length >= 7) {
+                            data.dates.push(values[0]);
+                            data.timestamps.push(parseInt(values[1]));
+                            data.open.push(parseFloat(values[2]));
+                            data.high.push(parseFloat(values[3]));
+                            data.low.push(parseFloat(values[4]));
+                            data.close.push(parseFloat(values[5]));
+                            data.volume.push(parseFloat(values[6]));
+                        }
+                    }
+
+                    marketData[symbol] = data;
+                    console.log(`Loaded ${symbol} using ${interval} data (${data.dates.length} points, ${data.dates[0]} to ${data.dates[data.dates.length-1]})`);
+                    return data;
+
+                } catch (error) {
+                    console.warn(`Could not load ${symbol} from ${interval}:`, error.message);
+                    continue; // Try next interval
                 }
-
-                marketData[symbol] = data;
-                return data;
-
-            } catch (error) {
-                console.error(`Error loading ${symbol} data from ../data/market_data/${symbol}_1d.csv:`, error);
-                throw new Error(`Failed to load ${symbol}: ${error.message}`);
             }
+
+            // If all intervals failed
+            throw new Error(`Failed to load ${symbol} data from any available source`);
         }
 
         // ============================================================================

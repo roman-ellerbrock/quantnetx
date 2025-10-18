@@ -40,33 +40,41 @@ SYMBOL_NAMES = {
 }
 
 def load_csv_data(symbol):
-    """Load market data from CSV file."""
+    """Load market data from CSV file. Try monthly first (longer history), then weekly."""
     if symbol == 'usd':
         return None  # USD is constant
 
-    filepath = os.path.join(DATA_DIR, f'{symbol}_1d.csv')
+    # Try monthly data first (longer history), then fall back to weekly
+    intervals = ['1mo', '1wk', '1d']
 
-    if not os.path.exists(filepath):
-        print(f"Warning: {filepath} not found")
-        return None
+    for interval in intervals:
+        filepath = os.path.join(DATA_DIR, f'{symbol}_{interval}.csv')
 
-    dates = []
-    close_prices = []
+        if not os.path.exists(filepath):
+            continue
 
-    with open(filepath, 'r') as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                if row['close'] and row['close'].strip():
-                    dates.append(row['date'])
-                    close_prices.append(float(row['close']))
-            except (ValueError, KeyError):
-                continue  # Skip rows with missing/invalid data
+        dates = []
+        close_prices = []
 
-    return {
-        'dates': dates,
-        'close': np.array(close_prices)
-    }
+        with open(filepath, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    if row['close'] and row['close'].strip():
+                        dates.append(row['date'])
+                        close_prices.append(float(row['close']))
+                except (ValueError, KeyError):
+                    continue  # Skip rows with missing/invalid data
+
+        if len(dates) > 0:
+            return {
+                'dates': dates,
+                'close': np.array(close_prices),
+                'interval': interval
+            }
+
+    print(f"Warning: No data found for {symbol}")
+    return None
 
 def align_data(data1, data2):
     """Align two datasets by common dates."""
@@ -167,7 +175,8 @@ def main():
         data = load_csv_data(symbol)
         if data is not None:
             market_data[symbol] = data
-            print(f"  ✓ Loaded {symbol}: {len(data['dates'])} days")
+            interval = data.get('interval', '1d')
+            print(f"  ✓ Loaded {symbol}: {len(data['dates'])} points ({interval})")
 
     print()
 

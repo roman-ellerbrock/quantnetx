@@ -16,8 +16,12 @@ SYMBOLS = {
     'NASDAQ': '^IXIC',     # NASDAQ Composite
     'COPPER': 'HG=F',      # Copper Futures
     'GOLD': 'GC=F',        # Gold Futures
+    'SILVER': 'SI=F',      # Silver Futures
+    'PALLADIUM': 'PA=F',   # Palladium Futures
+    'NICKEL': 'NICK.L',    # Nickel Futures (London)
     'OIL': 'CL=F',         # Crude Oil WTI Futures
     'TLT': 'TLT',          # iShares 20+ Year Treasury Bond ETF
+    'EEM': 'EEM',          # iShares MSCI Emerging Markets ETF
     'BTC': 'BTC-USD',      # Bitcoin (for comparison)
 }
 
