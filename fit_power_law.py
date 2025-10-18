@@ -27,12 +27,16 @@ from scipy import stats
 DATA_DIR = 'data/market_data'
 OUTPUT_FILE = 'data/power_law_fits.json'
 
-SYMBOLS = ['btc', 'sp500', 'nasdaq', 'gold', 'copper', 'oil', 'tlt']
+SYMBOLS = ['btc', 'sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt']
 SYMBOL_NAMES = {
     'btc': 'Bitcoin',
     'sp500': 'S&P 500',
     'nasdaq': 'NASDAQ',
+    'vti': 'VTI',
+    'eem': 'EEM',
     'gold': 'Gold',
+    'silver': 'Silver',
+    'palladium': 'Palladium',
     'copper': 'Copper',
     'oil': 'Oil',
     'tlt': 'TLT',
@@ -40,41 +44,38 @@ SYMBOL_NAMES = {
 }
 
 def load_csv_data(symbol):
-    """Load market data from CSV file. Try monthly first (longer history), then weekly."""
+    """Load market data from merged CSV file."""
     if symbol == 'usd':
         return None  # USD is constant
 
-    # Try monthly data first (longer history), then fall back to weekly
-    intervals = ['1mo', '1wk', '1d']
+    # Use merged file (combines all timeframes)
+    filepath = os.path.join(DATA_DIR, f'{symbol}.csv')
 
-    for interval in intervals:
-        filepath = os.path.join(DATA_DIR, f'{symbol}_{interval}.csv')
+    if not os.path.exists(filepath):
+        print(f"Warning: {filepath} not found")
+        return None
 
-        if not os.path.exists(filepath):
-            continue
+    dates = []
+    close_prices = []
 
-        dates = []
-        close_prices = []
+    with open(filepath, 'r') as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            try:
+                if row['close'] and row['close'].strip():
+                    dates.append(row['date'])
+                    close_prices.append(float(row['close']))
+            except (ValueError, KeyError):
+                continue  # Skip rows with missing/invalid data
 
-        with open(filepath, 'r') as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    if row['close'] and row['close'].strip():
-                        dates.append(row['date'])
-                        close_prices.append(float(row['close']))
-                except (ValueError, KeyError):
-                    continue  # Skip rows with missing/invalid data
+    if len(dates) == 0:
+        print(f"Warning: No valid data in {filepath}")
+        return None
 
-        if len(dates) > 0:
-            return {
-                'dates': dates,
-                'close': np.array(close_prices),
-                'interval': interval
-            }
-
-    print(f"Warning: No data found for {symbol}")
-    return None
+    return {
+        'dates': dates,
+        'close': np.array(close_prices)
+    }
 
 def align_data(data1, data2):
     """Align two datasets by common dates."""
@@ -175,8 +176,7 @@ def main():
         data = load_csv_data(symbol)
         if data is not None:
             market_data[symbol] = data
-            interval = data.get('interval', '1d')
-            print(f"  ✓ Loaded {symbol}: {len(data['dates'])} points ({interval})")
+            print(f"  ✓ Loaded {symbol}: {len(data['dates'])} points ({data['dates'][0]} to {data['dates'][-1]})")
 
     print()
 

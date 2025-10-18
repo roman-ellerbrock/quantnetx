@@ -43,13 +43,17 @@
                 <label for="numeratorSelect">Numerator</label>
                 <select id="numeratorSelect">
                     <option value="">Select asset...</option>
-                    <option value="btc" selected>Bitcoin (BTC)</option>
-                    <option value="sp500">S&P 500</option>
+                    <option value="sp500" selected>S&P 500</option>
                     <option value="nasdaq">NASDAQ</option>
+                    <option value="vti">VTI (Total Stock)</option>
+                    <option value="eem">EEM (Emerging Markets)</option>
                     <option value="gold">Gold</option>
+                    <option value="silver">Silver</option>
+                    <option value="palladium">Palladium</option>
                     <option value="copper">Copper</option>
                     <option value="oil">Oil (WTI)</option>
                     <option value="tlt">TLT (20Y Treasury)</option>
+                    <option value="btc">Bitcoin (BTC)</option>
                     <option value="usd">USD (Cash)</option>
                 </select>
             </div>
@@ -57,13 +61,17 @@
                 <label for="denominatorSelect">Denominator</label>
                 <select id="denominatorSelect">
                     <option value="">Select asset...</option>
-                    <option value="btc">Bitcoin (BTC)</option>
                     <option value="sp500">S&P 500</option>
                     <option value="nasdaq">NASDAQ</option>
+                    <option value="vti">VTI (Total Stock)</option>
+                    <option value="eem">EEM (Emerging Markets)</option>
                     <option value="gold">Gold</option>
+                    <option value="silver">Silver</option>
+                    <option value="palladium">Palladium</option>
                     <option value="copper">Copper</option>
                     <option value="oil">Oil (WTI)</option>
                     <option value="tlt">TLT (20Y Treasury)</option>
+                    <option value="btc">Bitcoin (BTC)</option>
                     <option value="usd" selected>USD (Cash)</option>
                 </select>
             </div>
@@ -91,7 +99,20 @@
 
         <div class="chart-container" id="riskMatrixContainer">
             <h3 style="color: #e4e4e4; margin-bottom: 15px;">Risk Matrix - Current Valuation of All Pairs</h3>
-            <div id="riskMatrix" style="width: 100%; height: 700px;"></div>
+            <div id="riskMatrix" style="width: 100%; height: 900px;"></div>
+        </div>
+
+        <div class="chart-container" id="averageRiskContainer">
+            <h3 style="color: #e4e4e4; margin-bottom: 15px;">Average Risk by Asset</h3>
+            <div id="averageRiskChart" style="width: 100%; height: 500px;"></div>
+        </div>
+
+        <div class="chart-container" id="averageCAGRContainer">
+            <h3 style="color: #e4e4e4; margin-bottom: 15px;">Annualized Growth Rate (CAGR) in USD Terms</h3>
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: -10px; margin-bottom: 15px;">
+                Note: Bitcoin excluded (CAGR ~55.6%) to maintain readable scale for traditional assets
+            </p>
+            <div id="averageCAGRChart" style="width: 100%; height: 500px;"></div>
         </div>
     </div>
 
@@ -104,7 +125,11 @@
             'btc': 'Bitcoin',
             'sp500': 'S&P 500',
             'nasdaq': 'NASDAQ',
+            'vti': 'VTI',
+            'eem': 'EEM',
             'gold': 'Gold',
+            'silver': 'Silver',
+            'palladium': 'Palladium',
             'copper': 'Copper',
             'oil': 'Oil (WTI)',
             'tlt': 'TLT',
@@ -178,57 +203,49 @@
                 return marketData['usd'];
             }
 
-            // Try monthly data first (longer history), then fall back to weekly
-            const intervals = ['1mo', '1wk'];
-
-            for (const interval of intervals) {
-                try {
-                    const response = await fetch(`../data/market_data/${symbol}_${interval}.csv`);
-                    if (!response.ok) {
-                        continue; // Try next interval
-                    }
-
-                    const csvText = await response.text();
-                    const lines = csvText.trim().split('\n');
-                    const headers = lines[0].split(',');
-
-                    const data = {
-                        dates: [],
-                        timestamps: [],
-                        open: [],
-                        high: [],
-                        low: [],
-                        close: [],
-                        volume: [],
-                        interval: interval  // Store which interval was used
-                    };
-
-                    // Parse CSV data
-                    for (let i = 1; i < lines.length; i++) {
-                        const values = lines[i].split(',');
-                        if (values.length >= 7) {
-                            data.dates.push(values[0]);
-                            data.timestamps.push(parseInt(values[1]));
-                            data.open.push(parseFloat(values[2]));
-                            data.high.push(parseFloat(values[3]));
-                            data.low.push(parseFloat(values[4]));
-                            data.close.push(parseFloat(values[5]));
-                            data.volume.push(parseFloat(values[6]));
-                        }
-                    }
-
-                    marketData[symbol] = data;
-                    console.log(`Loaded ${symbol} using ${interval} data (${data.dates.length} points, ${data.dates[0]} to ${data.dates[data.dates.length-1]})`);
-                    return data;
-
-                } catch (error) {
-                    console.warn(`Could not load ${symbol} from ${interval}:`, error.message);
-                    continue; // Try next interval
+            // Load merged data file (combines all timeframes)
+            try {
+                const response = await fetch(`../data/market_data/${symbol}.csv`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load ${symbol} data: HTTP ${response.status}`);
                 }
-            }
 
-            // If all intervals failed
-            throw new Error(`Failed to load ${symbol} data from any available source`);
+                const csvText = await response.text();
+                const lines = csvText.trim().split('\n');
+                const headers = lines[0].split(',');
+
+                const data = {
+                    dates: [],
+                    timestamps: [],
+                    open: [],
+                    high: [],
+                    low: [],
+                    close: [],
+                    volume: []
+                };
+
+                // Parse CSV data
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',');
+                    if (values.length >= 7) {
+                        data.dates.push(values[0]);
+                        data.timestamps.push(parseInt(values[1]));
+                        data.open.push(parseFloat(values[2]));
+                        data.high.push(parseFloat(values[3]));
+                        data.low.push(parseFloat(values[4]));
+                        data.close.push(parseFloat(values[5]));
+                        data.volume.push(parseFloat(values[6]));
+                    }
+                }
+
+                marketData[symbol] = data;
+                console.log(`Loaded ${symbol}: ${data.dates.length} points (${data.dates[0]} to ${data.dates[data.dates.length-1]})`);
+                return data;
+
+            } catch (error) {
+                console.error(`Error loading ${symbol} data from ../data/market_data/${symbol}.csv:`, error);
+                throw new Error(`Failed to load ${symbol}: ${error.message}`);
+            }
         }
 
         // ============================================================================
@@ -707,7 +724,7 @@
                 return;
             }
 
-            const symbols = ['btc', 'sp500', 'nasdaq', 'gold', 'copper', 'oil', 'tlt', 'usd'];
+            const symbols = ['sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'btc', 'usd'];
             const symbolLabels = symbols.map(s => SYMBOL_NAMES[s]);
 
             // Create matrix of risk values
@@ -837,6 +854,178 @@
             };
 
             Plotly.newPlot('riskMatrix', [trace], layout, config);
+
+            // Calculate and display average risk per asset
+            createAverageRiskChart(riskMatrix, symbols, symbolLabels);
+        }
+
+        async function createAverageRiskChart(riskMatrix, symbols, symbolLabels) {
+            // Calculate average risk for each asset (average per row, excluding diagonal)
+            const averageRisks = [];
+
+            for (let i = 0; i < symbols.length; i++) {
+                let sum = 0;
+                let count = 0;
+
+                for (let j = 0; j < symbols.length; j++) {
+                    if (i !== j && riskMatrix[i][j] !== null && !isNaN(riskMatrix[i][j])) {
+                        sum += riskMatrix[i][j];
+                        count++;
+                    }
+                }
+
+                averageRisks.push(count > 0 ? sum / count : 0);
+            }
+
+            // Create bar chart
+            const trace = {
+                x: symbolLabels,
+                y: averageRisks,
+                type: 'bar',
+                marker: {
+                    color: averageRisks.map(risk => {
+                        // Use same color scheme as matrix
+                        if (risk < -1.5) return '#7cb342';      // Very undervalued
+                        if (risk < -0.75) return '#9ccc65';     // Undervalued
+                        if (risk < -0.25) return '#c5e1a5';     // Slightly undervalued
+                        if (risk < 0.25) return '#90a4ae';      // Fair value
+                        if (risk < 0.75) return '#ffb74d';      // Slightly overvalued
+                        if (risk < 1.5) return '#ff9800';       // Overvalued
+                        return '#ef5350';                        // Very overvalued
+                    }),
+                    line: {
+                        color: 'rgba(255, 255, 255, 0.3)',
+                        width: 1
+                    }
+                },
+                hovertemplate: '%{x}<br>Average Risk: %{y:.2f}σ<extra></extra>'
+            };
+
+            const layout = {
+                title: {
+                    text: 'Average Risk Across All Trading Pairs (per asset)',
+                    font: { color: '#e4e4e4', size: 18 }
+                },
+                xaxis: {
+                    title: 'Asset',
+                    color: '#a0a0a0',
+                    tickangle: -45
+                },
+                yaxis: {
+                    title: 'Average Risk (σ)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    zeroline: true,
+                    zerolinecolor: 'rgba(255, 255, 255, 0.3)',
+                    zerolinewidth: 2
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                margin: { l: 80, r: 40, t: 80, b: 120 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('averageRiskChart', [trace], layout, config);
+
+            // Calculate and display average CAGR per asset
+            createAverageCAGRChart(symbols, symbolLabels);
+        }
+
+        async function createAverageCAGRChart(symbols, symbolLabels) {
+            const fits = await loadPowerLawFits();
+            if (!fits) {
+                console.warn('No power law fits available for CAGR chart');
+                return;
+            }
+
+            // Calculate CAGR for each asset in USD terms (exclude Bitcoin - it destroys the scale)
+            const cagrs = [];
+            const filteredSymbols = [];
+            const filteredLabels = [];
+
+            for (let i = 0; i < symbols.length; i++) {
+                // Skip Bitcoin for CAGR chart
+                if (symbols[i] === 'btc') {
+                    continue;
+                }
+
+                filteredSymbols.push(symbols[i]);
+                filteredLabels.push(symbolLabels[i]);
+
+                if (symbols[i] === 'usd') {
+                    cagrs.push(0); // USD vs USD is always 0%
+                } else {
+                    const pairKey = `${symbols[i]}/usd`;
+                    const fit = fits[pairKey];
+
+                    if (fit && !isNaN(fit.drift_annual)) {
+                        cagrs.push(fit.drift_annual * 100); // Convert to percentage
+                    } else {
+                        cagrs.push(0);
+                    }
+                }
+            }
+
+            // Create bar chart
+            const trace = {
+                x: filteredLabels,
+                y: cagrs,
+                type: 'bar',
+                marker: {
+                    color: cagrs.map(cagr => {
+                        // Green for positive growth, red for negative
+                        if (cagr > 10) return '#48bb78';        // Strong positive
+                        if (cagr > 5) return '#68d391';         // Good positive
+                        if (cagr > 0) return '#9ae6b4';         // Mild positive
+                        if (cagr > -5) return '#fbb6ce';        // Mild negative
+                        if (cagr > -10) return '#f687b3';       // Negative
+                        return '#ed64a6';                        // Strong negative
+                    }),
+                    line: {
+                        color: 'rgba(255, 255, 255, 0.3)',
+                        width: 1
+                    }
+                },
+                hovertemplate: '%{x}<br>Average CAGR: %{y:.2f}%<extra></extra>'
+            };
+
+            const layout = {
+                title: {
+                    text: 'Annualized Growth Rate (CAGR) vs USD',
+                    font: { color: '#e4e4e4', size: 18 }
+                },
+                xaxis: {
+                    title: 'Asset',
+                    color: '#a0a0a0',
+                    tickangle: -45
+                },
+                yaxis: {
+                    title: 'Average CAGR (%)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    zeroline: true,
+                    zerolinecolor: 'rgba(255, 255, 255, 0.3)',
+                    zerolinewidth: 2
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                margin: { l: 80, r: 40, t: 80, b: 120 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('averageCAGRChart', [trace], layout, config);
         }
 
         // ============================================================================
@@ -848,8 +1037,8 @@
             // Create risk matrix first
             await createRiskMatrix();
 
-            // Default: BTC/USD
-            document.getElementById('numeratorSelect').value = 'btc';
+            // Default: SP500/USD
+            document.getElementById('numeratorSelect').value = 'sp500';
             document.getElementById('denominatorSelect').value = 'usd';
             updatePairChart();
         });

@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 SYMBOLS = {
     'SP500': '^GSPC',      # S&P 500
     'NASDAQ': '^IXIC',     # NASDAQ Composite
+    'VTI': 'VTI',          # Vanguard Total Stock Market ETF
     'COPPER': 'HG=F',      # Copper Futures
     'GOLD': 'GC=F',        # Gold Futures
     'SILVER': 'SI=F',      # Silver Futures
