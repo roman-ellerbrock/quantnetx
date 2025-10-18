@@ -54,6 +54,7 @@
                     <option value="oil">Oil (WTI)</option>
                     <option value="tlt">TLT (20Y Treasury)</option>
                     <option value="btc">Bitcoin (BTC)</option>
+                    <option value="cpi">CPI (Consumer Price Index)</option>
                     <option value="usd">USD (Cash)</option>
                 </select>
             </div>
@@ -72,6 +73,7 @@
                     <option value="oil">Oil (WTI)</option>
                     <option value="tlt">TLT (20Y Treasury)</option>
                     <option value="btc">Bitcoin (BTC)</option>
+                    <option value="cpi">CPI (Consumer Price Index)</option>
                     <option value="usd" selected>USD (Cash)</option>
                 </select>
             </div>
@@ -102,6 +104,14 @@
             <div id="riskMatrix" style="width: 100%; height: 900px;"></div>
         </div>
 
+        <div class="chart-container" id="networkGraphContainer">
+            <h3 style="color: #e4e4e4; margin-bottom: 15px;">Asset Network Graph</h3>
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: -10px; margin-bottom: 15px;">
+                Nodes colored by average risk (same as "Average Risk by Asset"). Arrows point from undervalued to overvalued assets. Node proximity indicates similar risk patterns across all pairs.
+            </p>
+            <div id="networkGraph" style="width: 100%; height: 800px;"></div>
+        </div>
+
         <div class="chart-container" id="averageRiskContainer">
             <h3 style="color: #e4e4e4; margin-bottom: 15px;">Average Risk by Asset</h3>
             <div id="averageRiskChart" style="width: 100%; height: 500px;"></div>
@@ -113,6 +123,43 @@
                 Note: Bitcoin excluded (CAGR ~55.6%) to maintain readable scale for traditional assets
             </p>
             <div id="averageCAGRChart" style="width: 100%; height: 500px;"></div>
+        </div>
+
+        <div class="chart-container" id="ratioMetricsContainer">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #e4e4e4; margin: 0;">Risk-Adjusted Returns</h3>
+                <div class="control-group" style="margin: 0;">
+                    <label for="ratioMetricSelect" style="margin-right: 10px; color: #a0a0a0;">Metric:</label>
+                    <select id="ratioMetricSelect" style="padding: 5px 10px; background: rgba(255, 255, 255, 0.1); color: #e4e4e4; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px;">
+                        <option value="sharpe">Sharpe Ratio</option>
+                        <option value="sortino">Sortino Ratio</option>
+                    </select>
+                </div>
+            </div>
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: 0; margin-bottom: 15px;" id="ratioDescription">
+                Sharpe Ratio: Measures risk-adjusted return using total volatility. Higher is better.
+            </p>
+            <div id="ratioMetricsChart" style="width: 100%; height: 500px;"></div>
+        </div>
+
+        <div class="chart-container" id="riskReturnScatterContainer">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="color: #e4e4e4; margin: 0;">Risk-Return Trade-off</h3>
+                <div class="control-group" style="margin: 0;">
+                    <label for="scatterMetricSelect" style="margin-right: 10px; color: #a0a0a0;">Color by:</label>
+                    <select id="scatterMetricSelect" style="padding: 5px 10px; background: rgba(255, 255, 255, 0.1); color: #e4e4e4; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px;">
+                        <option value="sharpe">Sharpe Ratio</option>
+                        <option value="sortino" selected>Sortino Ratio</option>
+                    </select>
+                </div>
+            </div>
+            <p style="color: #a0a0a0; font-size: 0.9em; margin-top: 0; margin-bottom: 5px;" id="scatterDescription">
+                Annualized return vs annualized volatility. Color indicates Sortino ratio (darker green = better risk-adjusted returns).
+            </p>
+            <p style="color: #ff9800; font-size: 0.85em; margin-top: 0; margin-bottom: 15px;">
+                <strong>Note:</strong> Assets have different historical timeframes. S&P 500 and Gold have data since 1935, Oil since 1961, Bitcoin since 2014. Ratios computed over different periods may not be directly comparable.
+            </p>
+            <div id="riskReturnScatter" style="width: 100%; height: 600px;"></div>
         </div>
     </div>
 
@@ -133,6 +180,7 @@
             'copper': 'Copper',
             'oil': 'Oil (WTI)',
             'tlt': 'TLT',
+            'cpi': 'CPI',
             'usd': 'USD'
         };
 
@@ -160,10 +208,33 @@
 
         function formatNumber(num, decimals = 2) {
             if (!num || num === '' || isNaN(num)) return '-';
-            return parseFloat(num).toLocaleString('en-US', {
-                minimumFractionDigits: decimals,
-                maximumFractionDigits: decimals
-            });
+            const n = parseFloat(num);
+
+            // Format to 6 significant figures
+            const sigFigs = 6;
+
+            // Use toPrecision to get 6 significant figures
+            let formatted = n.toPrecision(sigFigs);
+
+            // Parse back to remove unnecessary trailing zeros and scientific notation
+            formatted = parseFloat(formatted);
+
+            // Add thousand separators using toLocaleString
+            // We need to preserve the precision from toPrecision
+            const str = formatted.toString();
+            const parts = str.split('.');
+
+            if (parts.length === 1) {
+                // No decimal part
+                return formatted.toLocaleString('en-US');
+            } else {
+                // Has decimal part - preserve it
+                const decimalPlaces = parts[1].length;
+                return formatted.toLocaleString('en-US', {
+                    minimumFractionDigits: decimalPlaces,
+                    maximumFractionDigits: decimalPlaces
+                });
+            }
         }
 
         // ============================================================================
@@ -201,6 +272,55 @@
             if (symbol === 'usd') {
                 marketData['usd'] = { constant: true, value: 1.0 };
                 return marketData['usd'];
+            }
+
+            // Special handling for CPI data
+            if (symbol === 'cpi') {
+                try {
+                    const response = await fetch(`../data/market_data/cpi_fred.csv`);
+                    if (!response.ok) {
+                        throw new Error(`Failed to load CPI data: HTTP ${response.status}`);
+                    }
+
+                    const csvText = await response.text();
+                    const lines = csvText.trim().split('\n');
+
+                    const data = {
+                        dates: [],
+                        timestamps: [],
+                        open: [],
+                        high: [],
+                        low: [],
+                        close: [],
+                        volume: []
+                    };
+
+                    // Parse CPI CSV data (observation_date, CPILFESL)
+                    for (let i = 1; i < lines.length; i++) {
+                        const values = lines[i].split(',');
+                        if (values.length >= 2) {
+                            const date = values[0];
+                            const cpiValue = parseFloat(values[1]);
+
+                            data.dates.push(date);
+                            data.timestamps.push(new Date(date).getTime());
+                            // Use CPI value for all price fields
+                            data.open.push(cpiValue);
+                            data.high.push(cpiValue);
+                            data.low.push(cpiValue);
+                            data.close.push(cpiValue);
+                            data.volume.push(0); // No volume for CPI
+                        }
+                    }
+
+                    marketData[symbol] = data;
+                    console.log(`Loaded ${symbol}: ${data.dates.length} points (${data.dates[0]} to ${data.dates[data.dates.length-1]})`);
+                    return data;
+
+                } catch (error) {
+                    console.error(`Error loading CPI data:`, error);
+                    throw new Error(`Failed to load CPI: ${error.message}`);
+                }
             }
 
             // Load merged data file (combines all timeframes)
@@ -321,6 +441,57 @@
             const mean = ratios.reduce((a, b) => a + b, 0) / ratios.length;
 
             return { current, start, change, max, min, mean };
+        }
+
+        // Calculate returns from price series
+        function calculateReturns(prices) {
+            const returns = [];
+            for (let i = 1; i < prices.length; i++) {
+                returns.push((prices[i] - prices[i-1]) / prices[i-1]);
+            }
+            return returns;
+        }
+
+        // Calculate Sharpe Ratio (annualized, assuming risk-free rate = 0)
+        function calculateSharpeRatio(returns, periodsPerYear = 252) {
+            if (returns.length === 0) return null;
+
+            const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+            const variance = returns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / returns.length;
+            const stdDev = Math.sqrt(variance);
+
+            if (stdDev === 0) return null;
+
+            // Annualized Sharpe Ratio
+            const annualizedReturn = meanReturn * periodsPerYear;
+            const annualizedStdDev = stdDev * Math.sqrt(periodsPerYear);
+
+            return annualizedReturn / annualizedStdDev;
+        }
+
+        // Calculate Sortino Ratio (annualized, assuming risk-free rate = 0)
+        function calculateSortinoRatio(returns, periodsPerYear = 252) {
+            if (returns.length === 0) return null;
+
+            const meanReturn = returns.reduce((a, b) => a + b, 0) / returns.length;
+
+            // Calculate downside deviation (only consider returns below the target/mean)
+            // Target return is 0 (risk-free rate)
+            const downsideSquaredSum = returns.reduce((sum, r) => {
+                return sum + (r < 0 ? Math.pow(r, 2) : 0);
+            }, 0);
+
+            // Divide by total number of returns (not just negative ones)
+            const downsideVariance = downsideSquaredSum / returns.length;
+            const downsideStdDev = Math.sqrt(downsideVariance);
+
+            if (downsideStdDev === 0) return null;
+
+            // Annualized Sortino Ratio
+            const annualizedReturn = meanReturn * periodsPerYear;
+            const annualizedDownsideStdDev = downsideStdDev * Math.sqrt(periodsPerYear);
+
+            return annualizedReturn / annualizedDownsideStdDev;
         }
 
         // ============================================================================
@@ -713,6 +884,20 @@
         document.getElementById('scaleSelect').addEventListener('change', updatePairChart);
         document.getElementById('normalizeCheck').addEventListener('change', updatePairChart);
 
+        // Event listener for ratio metric selector
+        document.getElementById('ratioMetricSelect').addEventListener('change', async () => {
+            const symbols = ['sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'btc', 'cpi', 'usd'];
+            const symbolLabels = symbols.map(s => SYMBOL_NAMES[s]);
+            await createRatioMetricsChart(symbols, symbolLabels);
+        });
+
+        // Event listener for scatter metric selector
+        document.getElementById('scatterMetricSelect').addEventListener('change', async () => {
+            const symbols = ['sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'btc', 'cpi', 'usd'];
+            const symbolLabels = symbols.map(s => SYMBOL_NAMES[s]);
+            await createRiskReturnScatter(symbols, symbolLabels);
+        });
+
         // ============================================================================
         // Risk Matrix
         // ============================================================================
@@ -724,7 +909,7 @@
                 return;
             }
 
-            const symbols = ['sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'btc', 'usd'];
+            const symbols = ['sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'btc', 'cpi', 'usd'];
             const symbolLabels = symbols.map(s => SYMBOL_NAMES[s]);
 
             // Create matrix of risk values
@@ -855,8 +1040,247 @@
 
             Plotly.newPlot('riskMatrix', [trace], layout, config);
 
+            // Create network graph based on risk matrix
+            createNetworkGraph(riskMatrix, symbols, symbolLabels);
+
             // Calculate and display average risk per asset
             createAverageRiskChart(riskMatrix, symbols, symbolLabels);
+        }
+
+        function createNetworkGraph(riskMatrix, symbols, symbolLabels) {
+            // Calculate node positions using MDS (Multidimensional Scaling) based on risk pattern similarity
+            // Compute distance matrix: distance between two assets based on their risk pattern similarity
+            const n = symbols.length;
+            const distanceMatrix = [];
+
+            for (let i = 0; i < n; i++) {
+                const row = [];
+                for (let j = 0; j < n; j++) {
+                    if (i === j) {
+                        row.push(0);
+                    } else {
+                        // Euclidean distance between risk patterns (rows of risk matrix)
+                        let sumSq = 0;
+                        for (let k = 0; k < n; k++) {
+                            const val1 = riskMatrix[i][k] !== null ? riskMatrix[i][k] : 0;
+                            const val2 = riskMatrix[j][k] !== null ? riskMatrix[j][k] : 0;
+                            sumSq += Math.pow(val1 - val2, 2);
+                        }
+                        row.push(Math.sqrt(sumSq));
+                    }
+                }
+                distanceMatrix.push(row);
+            }
+
+            // Simple MDS: use classical MDS (PCoA) to get 2D coordinates
+            // For simplicity, we'll use a force-directed approach
+            // Initialize random positions
+            const positions = symbols.map(() => ({
+                x: Math.random() * 10 - 5,
+                y: Math.random() * 10 - 5
+            }));
+
+            // Run simple force-directed layout iterations
+            const iterations = 100;
+            const learningRate = 0.1;
+
+            for (let iter = 0; iter < iterations; iter++) {
+                for (let i = 0; i < n; i++) {
+                    let fx = 0, fy = 0;
+
+                    for (let j = 0; j < n; j++) {
+                        if (i === j) continue;
+
+                        const dx = positions[j].x - positions[i].x;
+                        const dy = positions[j].y - positions[i].y;
+                        const currentDist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+                        const targetDist = distanceMatrix[i][j];
+
+                        // Spring force: attract if too far, repel if too close
+                        const force = (currentDist - targetDist) * learningRate;
+
+                        fx += force * (dx / currentDist);
+                        fy += force * (dy / currentDist);
+                    }
+
+                    positions[i].x += fx;
+                    positions[i].y += fy;
+                }
+            }
+
+            // Create edge traces and arrowhead annotations
+            // Edges will be rendered as traces (behind nodes), arrowheads as small annotations
+            const traces = [];
+            const arrowAnnotations = [];
+
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    if (i === j) continue;
+
+                    const riskValue = riskMatrix[i][j];
+                    if (riskValue !== null && !isNaN(riskValue)) {
+                        // Only draw edges for significant risk values
+                        if (Math.abs(riskValue) > 0.5) {
+                            // Determine direction based on risk:
+                            // If riskValue < 0: asset i is undervalued relative to j -> arrow points from i to j
+                            // If riskValue > 0: asset i is overvalued relative to j -> arrow points from j to i
+                            let startX, startY, endX, endY;
+
+                            if (riskValue < 0) {
+                                // i is undervalued relative to j, arrow: i -> j
+                                startX = positions[i].x;
+                                startY = positions[i].y;
+                                endX = positions[j].x;
+                                endY = positions[j].y;
+                            } else {
+                                // i is overvalued relative to j, arrow: j -> i
+                                startX = positions[j].x;
+                                startY = positions[j].y;
+                                endX = positions[i].x;
+                                endY = positions[i].y;
+                            }
+
+                            // Color based on risk magnitude - use subtle gray
+                            const absRisk = Math.abs(riskValue);
+                            const opacity = Math.min(absRisk / 6, 0.25);  // Much lower opacity
+                            const baseColor = '144, 164, 174';  // Always gray
+                            const color = `rgba(${baseColor}, ${opacity})`;
+
+                            // Add edge trace (line)
+                            traces.push({
+                                x: [startX, endX],
+                                y: [startY, endY],
+                                type: 'scatter',
+                                mode: 'lines',
+                                line: {
+                                    color: color,
+                                    width: Math.min(absRisk * 0.4, 1.2)  // Thinner lines
+                                },
+                                showlegend: false,
+                                hoverinfo: 'skip'
+                            });
+
+                            // Add small arrowhead annotation
+                            // Position it near the end but not overlapping the node
+                            const dx = endX - startX;
+                            const dy = endY - startY;
+                            const length = Math.sqrt(dx * dx + dy * dy);
+                            const arrowX = endX - (dx / length) * 0.5;  // 0.5 units before the node
+                            const arrowY = endY - (dy / length) * 0.5;
+
+                            arrowAnnotations.push({
+                                x: arrowX,
+                                y: arrowY,
+                                ax: arrowX - (dx / length) * 0.3,
+                                ay: arrowY - (dy / length) * 0.3,
+                                xref: 'x',
+                                yref: 'y',
+                                axref: 'x',
+                                ayref: 'y',
+                                showarrow: true,
+                                arrowhead: 2,
+                                arrowsize: 1,
+                                arrowwidth: 1.5,
+                                arrowcolor: color
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Create node trace
+            const nodeX = positions.map(p => p.x);
+            const nodeY = positions.map(p => p.y);
+
+            // Calculate node colors based on average risk (same as "Average Risk by Asset" chart)
+            const nodeColors = symbols.map((_, i) => {
+                let sum = 0, count = 0;
+                for (let j = 0; j < n; j++) {
+                    if (i !== j && riskMatrix[i][j] !== null && !isNaN(riskMatrix[i][j])) {
+                        sum += riskMatrix[i][j];
+                        count++;
+                    }
+                }
+                return count > 0 ? sum / count : 0;
+            });
+
+            const nodeTrace = {
+                x: nodeX,
+                y: nodeY,
+                text: symbolLabels,
+                mode: 'markers+text',
+                type: 'scatter',
+                marker: {
+                    size: 45,
+                    color: nodeColors,
+                    colorscale: [
+                        [0.0, '#7cb342'],   // Undervalued
+                        [0.25, '#9ccc65'],  // Slightly undervalued
+                        [0.5, '#90a4ae'],   // Fair value
+                        [0.75, '#ff9800'],  // Slightly overvalued
+                        [1.0, '#ef5350']    // Overvalued
+                    ],
+                    cmin: -1.5,
+                    cmax: 1.5,
+                    showscale: true,
+                    colorbar: {
+                        title: 'Avg Risk (σ)',
+                        thickness: 15,
+                        len: 0.5,
+                        x: 1.02,
+                        xanchor: 'left'
+                    },
+                    line: {
+                        color: '#ffffff',
+                        width: 3
+                    }
+                },
+                textposition: 'middle center',
+                textfont: {
+                    size: 10.5,
+                    color: '#ffffff',
+                    family: 'Arial, sans-serif',
+                    weight: 'bold'
+                },
+                hovertemplate: '<b>%{text}</b><br>Avg Risk: %{marker.color:.2f}σ<extra></extra>'
+            };
+
+            // Add all edge traces first, then node trace (so nodes are on top)
+            const allTraces = [...traces, nodeTrace];
+
+            const layout = {
+                title: {
+                    text: 'Asset Relationship Network',
+                    font: { color: '#e4e4e4', size: 18 }
+                },
+                showlegend: false,
+                xaxis: {
+                    showgrid: false,
+                    zeroline: false,
+                    showticklabels: false,
+                    color: '#a0a0a0'
+                },
+                yaxis: {
+                    showgrid: false,
+                    zeroline: false,
+                    showticklabels: false,
+                    color: '#a0a0a0'
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                hovermode: 'closest',
+                margin: { l: 40, r: 120, t: 80, b: 40 },
+                annotations: arrowAnnotations
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('networkGraph', allTraces, layout, config);
         }
 
         async function createAverageRiskChart(riskMatrix, symbols, symbolLabels) {
@@ -978,8 +1402,12 @@
                 y: cagrs,
                 type: 'bar',
                 marker: {
-                    color: cagrs.map(cagr => {
-                        // Green for positive growth, red for negative
+                    color: filteredSymbols.map((symbol, i) => {
+                        // Color CPI in red, others based on CAGR value
+                        if (symbol === 'cpi') return '#ef5350';  // Red for CPI
+
+                        const cagr = cagrs[i];
+                        // Green for positive growth, pink for negative
                         if (cagr > 10) return '#48bb78';        // Strong positive
                         if (cagr > 5) return '#68d391';         // Good positive
                         if (cagr > 0) return '#9ae6b4';         // Mild positive
@@ -1026,6 +1454,285 @@
             };
 
             Plotly.newPlot('averageCAGRChart', [trace], layout, config);
+
+            // Calculate and display ratio metrics
+            createRatioMetricsChart(symbols, symbolLabels);
+        }
+
+        async function createRatioMetricsChart(symbols, symbolLabels) {
+            const metricType = document.getElementById('ratioMetricSelect').value;
+
+            // Update description
+            const descriptionEl = document.getElementById('ratioDescription');
+            if (metricType === 'sharpe') {
+                descriptionEl.textContent = 'Sharpe Ratio: Measures risk-adjusted return using total volatility. Higher is better.';
+            } else {
+                descriptionEl.textContent = 'Sortino Ratio: Measures risk-adjusted return using downside volatility only. Higher is better.';
+            }
+
+            // Calculate ratios for each asset vs USD
+            const ratios = [];
+            const filteredSymbols = [];
+            const filteredLabels = [];
+
+            for (let i = 0; i < symbols.length; i++) {
+                // Skip USD (can't calculate ratio vs itself) and CPI
+                if (symbols[i] === 'usd' || symbols[i] === 'cpi') {
+                    continue;
+                }
+
+                try {
+                    const data = await loadMarketData(symbols[i]);
+
+                    if (data.close && data.close.length > 1) {
+                        const returns = calculateReturns(data.close);
+
+                        // Determine periods per year based on data frequency
+                        // Approximate from data timestamps
+                        let periodsPerYear = 252; // Default to daily
+                        if (data.timestamps && data.timestamps.length > 1) {
+                            const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
+                                                   (data.timestamps.length - 1) / (1000 * 60 * 60 * 24);
+                            if (avgDaysBetween > 25) {
+                                periodsPerYear = 12; // Monthly data
+                            } else if (avgDaysBetween > 5) {
+                                periodsPerYear = 52; // Weekly data
+                            }
+                        }
+
+                        let ratio;
+                        if (metricType === 'sharpe') {
+                            ratio = calculateSharpeRatio(returns, periodsPerYear);
+                        } else {
+                            ratio = calculateSortinoRatio(returns, periodsPerYear);
+                        }
+
+                        if (ratio !== null && !isNaN(ratio)) {
+                            filteredSymbols.push(symbols[i]);
+                            filteredLabels.push(symbolLabels[i]);
+                            ratios.push(ratio);
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Could not calculate ${metricType} ratio for ${symbols[i]}:`, error);
+                }
+            }
+
+            // Create bar chart
+            const metricName = metricType === 'sharpe' ? 'Sharpe Ratio' : 'Sortino Ratio';
+
+            const trace = {
+                x: filteredLabels,
+                y: ratios,
+                type: 'bar',
+                marker: {
+                    color: ratios.map(ratio => {
+                        // Color based on ratio value
+                        // Sharpe/Sortino > 2 is excellent, > 1 is good, > 0 is okay, < 0 is bad
+                        if (ratio > 2) return '#48bb78';        // Excellent (dark green)
+                        if (ratio > 1) return '#68d391';        // Good (green)
+                        if (ratio > 0.5) return '#9ae6b4';      // Above average (light green)
+                        if (ratio > 0) return '#90a4ae';        // Okay (gray)
+                        if (ratio > -0.5) return '#fbb6ce';     // Below average (light pink)
+                        if (ratio > -1) return '#f687b3';       // Poor (pink)
+                        return '#ed64a6';                        // Very poor (dark pink)
+                    }),
+                    line: {
+                        color: 'rgba(255, 255, 255, 0.3)',
+                        width: 1
+                    }
+                },
+                hovertemplate: `%{x}<br>${metricName}: %{y:.2f}<extra></extra>`
+            };
+
+            const layout = {
+                title: {
+                    text: `${metricName} by Asset`,
+                    font: { color: '#e4e4e4', size: 18 }
+                },
+                xaxis: {
+                    title: 'Asset',
+                    color: '#a0a0a0',
+                    tickangle: -45
+                },
+                yaxis: {
+                    title: metricName,
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    zeroline: true,
+                    zerolinecolor: 'rgba(255, 255, 255, 0.3)',
+                    zerolinewidth: 2
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                margin: { l: 80, r: 40, t: 80, b: 120 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('ratioMetricsChart', [trace], layout, config);
+
+            // Create risk-return scatter plot
+            createRiskReturnScatter(symbols, symbolLabels);
+        }
+
+        async function createRiskReturnScatter(symbols, symbolLabels) {
+            const metricType = document.getElementById('scatterMetricSelect').value;
+
+            // Update description
+            const descriptionEl = document.getElementById('scatterDescription');
+            if (metricType === 'sharpe') {
+                descriptionEl.textContent = 'Annualized return vs annualized volatility. Color indicates Sharpe ratio (darker green = better risk-adjusted returns).';
+            } else {
+                descriptionEl.textContent = 'Annualized return vs annualized volatility. Color indicates Sortino ratio (darker green = better risk-adjusted returns).';
+            }
+
+            // Calculate returns, volatility, and selected ratio for each asset
+            const returns = [];
+            const volatilities = [];
+            const ratioValues = [];
+            const labels = [];
+
+            for (let i = 0; i < symbols.length; i++) {
+                // Skip USD (no return) and CPI
+                if (symbols[i] === 'usd' || symbols[i] === 'cpi') {
+                    continue;
+                }
+
+                try {
+                    const data = await loadMarketData(symbols[i]);
+
+                    if (data.close && data.close.length > 1) {
+                        const assetReturns = calculateReturns(data.close);
+
+                        // Determine periods per year based on data frequency
+                        let periodsPerYear = 252; // Default to daily
+                        if (data.timestamps && data.timestamps.length > 1) {
+                            const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
+                                                   (data.timestamps.length - 1) / (1000 * 60 * 60 * 24);
+                            if (avgDaysBetween > 25) {
+                                periodsPerYear = 12; // Monthly data
+                            } else if (avgDaysBetween > 5) {
+                                periodsPerYear = 52; // Weekly data
+                            }
+                        }
+
+                        // Calculate mean and standard deviation
+                        const meanReturn = assetReturns.reduce((a, b) => a + b, 0) / assetReturns.length;
+                        const variance = assetReturns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / assetReturns.length;
+                        const stdDev = Math.sqrt(variance);
+
+                        // Annualize
+                        const annualizedReturn = meanReturn * periodsPerYear * 100; // Convert to percentage
+                        const annualizedVolatility = stdDev * Math.sqrt(periodsPerYear) * 100; // Convert to percentage
+
+                        // Calculate selected ratio
+                        let ratio;
+                        if (metricType === 'sharpe') {
+                            ratio = calculateSharpeRatio(assetReturns, periodsPerYear);
+                        } else {
+                            ratio = calculateSortinoRatio(assetReturns, periodsPerYear);
+                        }
+
+                        if (!isNaN(annualizedReturn) && !isNaN(annualizedVolatility) && ratio !== null) {
+                            returns.push(annualizedReturn);
+                            volatilities.push(annualizedVolatility);
+                            ratioValues.push(ratio);
+                            labels.push(symbolLabels[i]);
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Could not calculate metrics for ${symbols[i]}:`, error);
+                }
+            }
+
+            // Create scatter plot
+            const metricName = metricType === 'sharpe' ? 'Sharpe Ratio' : 'Sortino Ratio';
+
+            const trace = {
+                x: volatilities,
+                y: returns,
+                text: labels,
+                mode: 'markers+text',
+                type: 'scatter',
+                marker: {
+                    size: 12,  // Uniform size for all bubbles
+                    color: ratioValues,
+                    colorscale: [
+                        [0.0, '#ef5350'],   // Low Sharpe (red)
+                        [0.2, '#ff9800'],   // Below average (orange)
+                        [0.4, '#ffb74d'],   // Average (light orange)
+                        [0.6, '#90a4ae'],   // Neutral (gray)
+                        [0.8, '#9ae6b4'],   // Good (light green)
+                        [1.0, '#48bb78']    // Excellent (dark green)
+                    ],
+                    showscale: true,
+                    colorbar: {
+                        title: {
+                            text: metricType === 'sharpe' ? 'Sharpe<br>Ratio' : 'Sortino<br>Ratio',
+                            side: 'right'
+                        },
+                        thickness: 15,
+                        len: 0.7,
+                        x: 1.02,
+                        xanchor: 'left'
+                    },
+                    line: {
+                        color: 'rgba(255, 255, 255, 0.5)',
+                        width: 1
+                    }
+                },
+                textposition: 'top center',
+                textfont: {
+                    size: 10,
+                    color: '#e4e4e4'
+                },
+                hovertemplate: '<b>%{text}</b><br>' +
+                               'Return: %{y:.2f}%<br>' +
+                               'Volatility: %{x:.2f}%<br>' +
+                               metricName + ': %{marker.color:.2f}<extra></extra>'
+            };
+
+            const layout = {
+                title: {
+                    text: 'Risk-Return Scatter Plot',
+                    font: { color: '#e4e4e4', size: 18 }
+                },
+                xaxis: {
+                    title: 'Annualized Volatility (%)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    zeroline: true,
+                    zerolinecolor: 'rgba(255, 255, 255, 0.3)',
+                    zerolinewidth: 2
+                },
+                yaxis: {
+                    title: 'Annualized Return (%)',
+                    color: '#a0a0a0',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)',
+                    zeroline: true,
+                    zerolinecolor: 'rgba(255, 255, 255, 0.3)',
+                    zerolinewidth: 2
+                },
+                plot_bgcolor: 'rgba(0, 0, 0, 0.2)',
+                paper_bgcolor: 'rgba(0, 0, 0, 0)',
+                font: { color: '#e4e4e4' },
+                hovermode: 'closest',
+                margin: { l: 80, r: 120, t: 80, b: 80 }
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                displaylogo: false
+            };
+
+            Plotly.newPlot('riskReturnScatter', [trace], layout, config);
         }
 
         // ============================================================================

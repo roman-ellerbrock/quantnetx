@@ -27,7 +27,7 @@ from scipy import stats
 DATA_DIR = 'data/market_data'
 OUTPUT_FILE = 'data/power_law_fits.json'
 
-SYMBOLS = ['btc', 'sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt']
+SYMBOLS = ['btc', 'sp500', 'nasdaq', 'vti', 'eem', 'gold', 'silver', 'palladium', 'copper', 'oil', 'tlt', 'cpi']
 SYMBOL_NAMES = {
     'btc': 'Bitcoin',
     'sp500': 'S&P 500',
@@ -40,6 +40,7 @@ SYMBOL_NAMES = {
     'copper': 'Copper',
     'oil': 'Oil',
     'tlt': 'TLT',
+    'cpi': 'CPI',
     'usd': 'USD'
 }
 
@@ -47,6 +48,37 @@ def load_csv_data(symbol):
     """Load market data from merged CSV file."""
     if symbol == 'usd':
         return None  # USD is constant
+
+    # Special handling for CPI data
+    if symbol == 'cpi':
+        filepath = os.path.join(DATA_DIR, 'cpi_fred.csv')
+
+        if not os.path.exists(filepath):
+            print(f"Warning: {filepath} not found")
+            return None
+
+        dates = []
+        close_prices = []
+
+        with open(filepath, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    # CPI CSV has columns: observation_date, CPILFESL
+                    if row['CPILFESL'] and row['CPILFESL'].strip():
+                        dates.append(row['observation_date'])
+                        close_prices.append(float(row['CPILFESL']))
+                except (ValueError, KeyError):
+                    continue  # Skip rows with missing/invalid data
+
+        if len(dates) == 0:
+            print(f"Warning: No valid data in {filepath}")
+            return None
+
+        return {
+            'dates': dates,
+            'close': np.array(close_prices)
+        }
 
     # Use merged file (combines all timeframes)
     filepath = os.path.join(DATA_DIR, f'{symbol}.csv')
@@ -78,7 +110,7 @@ def load_csv_data(symbol):
     }
 
 def align_data(data1, data2):
-    """Align two datasets by common dates."""
+    """Align two datasets by common dates or months."""
     if data1 is None:  # USD case
         return None, data2['close'], data2['dates']
     if data2 is None:  # USD case
@@ -88,13 +120,47 @@ def align_data(data1, data2):
     date_to_idx1 = {date: i for i, date in enumerate(data1['dates'])}
     date_to_idx2 = {date: i for i, date in enumerate(data2['dates'])}
 
-    # Find common dates
+    # Try exact date matching first
     common_dates = sorted(set(data1['dates']) & set(data2['dates']))
 
-    aligned1 = np.array([data1['close'][date_to_idx1[d]] for d in common_dates])
-    aligned2 = np.array([data2['close'][date_to_idx2[d]] for d in common_dates])
+    # If we have enough common dates, use exact matching
+    if len(common_dates) >= 100:
+        aligned1 = np.array([data1['close'][date_to_idx1[d]] for d in common_dates])
+        aligned2 = np.array([data2['close'][date_to_idx2[d]] for d in common_dates])
+        return aligned1, aligned2, common_dates
 
-    return aligned1, aligned2, common_dates
+    # Otherwise, try month-based alignment (for CPI and other monthly data)
+    # Group data by year-month
+    def get_year_month(date_str):
+        """Extract year-month from date string."""
+        return date_str[:7]  # 'YYYY-MM'
+
+    # Create month to index mapping (use last available data point in each month)
+    month_to_idx1 = {}
+    for i, date in enumerate(data1['dates']):
+        ym = get_year_month(date)
+        month_to_idx1[ym] = i  # Overwrites with later dates in same month
+
+    month_to_idx2 = {}
+    for i, date in enumerate(data2['dates']):
+        ym = get_year_month(date)
+        month_to_idx2[ym] = i
+
+    # Find common months
+    common_months = sorted(set(month_to_idx1.keys()) & set(month_to_idx2.keys()))
+
+    if len(common_months) < 100:
+        # Still insufficient data
+        aligned1 = np.array([data1['close'][date_to_idx1[d]] for d in common_dates])
+        aligned2 = np.array([data2['close'][date_to_idx2[d]] for d in common_dates])
+        return aligned1, aligned2, common_dates
+
+    # Align by month
+    aligned1 = np.array([data1['close'][month_to_idx1[m]] for m in common_months])
+    aligned2 = np.array([data2['close'][month_to_idx2[m]] for m in common_months])
+    aligned_dates = [data1['dates'][month_to_idx1[m]] for m in common_months]
+
+    return aligned1, aligned2, aligned_dates
 
 def fit_power_law(ratio_data, dates):
     """
@@ -277,7 +343,7 @@ def main():
     print("Interesting Pairs:")
     print("-" * 70)
 
-    interesting_pairs = ['btc/usd', 'gold/usd', 'btc/gold', 'sp500/nasdaq', 'gold/copper']
+    interesting_pairs = ['btc/usd', 'gold/usd', 'btc/gold', 'sp500/nasdaq', 'gold/copper', 'sp500/cpi', 'gold/cpi', 'btc/cpi']
 
     for pair in interesting_pairs:
         if pair in all_fits:

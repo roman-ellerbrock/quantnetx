@@ -1,7 +1,7 @@
 {
   "metadata": {
-    "generated_at": "2025-10-18 02:34:29",
-    "total_pairs": 132,
+    "generated_at": "2025-10-18 14:44:44",
+    "total_pairs": 156,
     "description": "Power law (exponential) fits for trading pairs",
     "model": "R(t) = R(0) * exp(\u03bc*t), or log(R(t)) = log(R(0)) + \u03bc*t",
     "units": {
@@ -150,6 +150,20 @@
       "residual_std": 0.5976941734677671,
       "r_squared": 0.907729626850764,
       "initial_value": 2.6048808053206916
+    },
+    "btc/cpi": {
+      "numerator": "btc",
+      "denominator": "cpi",
+      "numerator_name": "Bitcoin",
+      "denominator_name": "CPI",
+      "data_points": 132,
+      "start_date": "2014-09-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.5285786614010066,
+      "volatility_annual": 0.6655163292307216,
+      "residual_std": 0.6655163292307216,
+      "r_squared": 0.8641395872883026,
+      "initial_value": 1.5748258167620168
     },
     "btc/usd": {
       "numerator": "btc",
@@ -305,6 +319,20 @@
       "r_squared": 0.7124953382691405,
       "initial_value": 8.592630148891956
     },
+    "sp500/cpi": {
+      "numerator": "sp500",
+      "denominator": "cpi",
+      "numerator_name": "S&P 500",
+      "denominator_name": "CPI",
+      "data_points": 571,
+      "start_date": "1957-01-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.031646626652707954,
+      "volatility_annual": 0.35975299572942815,
+      "residual_std": 0.35975299572942815,
+      "r_squared": 0.7507112023401119,
+      "initial_value": 1.2214725665153465
+    },
     "sp500/usd": {
       "numerator": "sp500",
       "denominator": "usd",
@@ -458,6 +486,20 @@
       "residual_std": 0.28062629654120513,
       "r_squared": 0.8501233716028248,
       "initial_value": 13.227926360002416
+    },
+    "nasdaq/cpi": {
+      "numerator": "nasdaq",
+      "denominator": "cpi",
+      "numerator_name": "NASDAQ",
+      "denominator_name": "CPI",
+      "data_points": 600,
+      "start_date": "1971-02-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.06467985979246556,
+      "volatility_annual": 0.3154719020377035,
+      "residual_std": 0.3154719020377035,
+      "r_squared": 0.9059042058412968,
+      "initial_value": 1.2271374818452128
     },
     "nasdaq/usd": {
       "numerator": "nasdaq",
@@ -613,6 +655,20 @@
       "r_squared": 0.7452470399913517,
       "initial_value": 0.4246961732462422
     },
+    "vti/cpi": {
+      "numerator": "vti",
+      "denominator": "cpi",
+      "numerator_name": "VTI",
+      "denominator_name": "CPI",
+      "data_points": 291,
+      "start_date": "2001-06-25",
+      "end_date": "2025-08-25",
+      "drift_annual": 0.05581250982804049,
+      "volatility_annual": 0.17002320881827904,
+      "residual_std": 0.17002320881827904,
+      "r_squared": 0.8407819105853332,
+      "initial_value": 0.20624465879627624
+    },
     "vti/usd": {
       "numerator": "vti",
       "denominator": "usd",
@@ -766,6 +822,20 @@
       "residual_std": 0.2596373932134441,
       "r_squared": 0.1045257581466838,
       "initial_value": 0.29685650988271084
+    },
+    "eem/cpi": {
+      "numerator": "eem",
+      "denominator": "cpi",
+      "numerator_name": "EEM",
+      "denominator_name": "CPI",
+      "data_points": 269,
+      "start_date": "2003-04-28",
+      "end_date": "2025-08-25",
+      "drift_annual": 0.004772886412191406,
+      "volatility_annual": 0.2380076535976888,
+      "residual_std": 0.2380076535976888,
+      "r_squared": 0.01656086486490605,
+      "initial_value": 0.14613397398913155
     },
     "eem/usd": {
       "numerator": "eem",
@@ -921,6 +991,20 @@
       "r_squared": 0.6670437120931433,
       "initial_value": 5.152767278175947
     },
+    "gold/cpi": {
+      "numerator": "gold",
+      "denominator": "cpi",
+      "numerator_name": "Gold",
+      "denominator_name": "CPI",
+      "data_points": 488,
+      "start_date": "1957-01-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.02387317135745536,
+      "volatility_annual": 0.4307664357167976,
+      "residual_std": 0.4307664357167976,
+      "r_squared": 0.5216891576533597,
+      "initial_value": 1.159217946051241
+    },
     "gold/usd": {
       "numerator": "gold",
       "denominator": "usd",
@@ -1074,6 +1158,20 @@
       "residual_std": 0.40215006767267075,
       "r_squared": 0.33198128336738286,
       "initial_value": 0.09429705920545013
+    },
+    "silver/cpi": {
+      "numerator": "silver",
+      "denominator": "cpi",
+      "numerator_name": "Silver",
+      "denominator_name": "CPI",
+      "data_points": 301,
+      "start_date": "2000-08-28",
+      "end_date": "2025-08-25",
+      "drift_annual": 0.04394755409826141,
+      "volatility_annual": 0.39133037561406686,
+      "residual_std": 0.39133037561406686,
+      "r_squared": 0.39804422309346177,
+      "initial_value": 0.03650488094407457
     },
     "silver/usd": {
       "numerator": "silver",
@@ -1229,6 +1327,20 @@
       "r_squared": 0.7893972903210248,
       "initial_value": 2.2638052338277985
     },
+    "palladium/cpi": {
+      "numerator": "palladium",
+      "denominator": "cpi",
+      "numerator_name": "Palladium",
+      "denominator_name": "CPI",
+      "data_points": 318,
+      "start_date": "1998-09-28",
+      "end_date": "2025-08-25",
+      "drift_annual": 0.05077662814827584,
+      "volatility_annual": 0.4574583428554821,
+      "residual_std": 0.4574583428554821,
+      "r_squared": 0.4312210096713405,
+      "initial_value": 1.3763731094366356
+    },
     "palladium/usd": {
       "numerator": "palladium",
       "denominator": "usd",
@@ -1382,6 +1494,20 @@
       "residual_std": 0.3994370395174139,
       "r_squared": 0.19900263986192726,
       "initial_value": 0.018128213734845165
+    },
+    "copper/cpi": {
+      "numerator": "copper",
+      "denominator": "cpi",
+      "numerator_name": "Copper",
+      "denominator_name": "CPI",
+      "data_points": 257,
+      "start_date": "2000-08-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.03465040601729918,
+      "volatility_annual": 0.38408722987421756,
+      "residual_std": 0.38408722987421756,
+      "r_squared": 0.29927856545069204,
+      "initial_value": 0.0068300592318913155
     },
     "copper/usd": {
       "numerator": "copper",
@@ -1537,6 +1663,20 @@
       "r_squared": 0.0009264350270843954,
       "initial_value": 0.6077824524821706
     },
+    "oil/cpi": {
+      "numerator": "oil",
+      "denominator": "cpi",
+      "numerator_name": "Oil",
+      "denominator_name": "CPI",
+      "data_points": 515,
+      "start_date": "1961-08-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.014703436899403163,
+      "volatility_annual": 0.47925403281459594,
+      "residual_std": 0.47925403281459594,
+      "r_squared": 0.23832878510643551,
+      "initial_value": 0.11083863469909029
+    },
     "oil/usd": {
       "numerator": "oil",
       "denominator": "usd",
@@ -1691,6 +1831,20 @@
       "r_squared": 0.0009264350270843937,
       "initial_value": 1.6453255534377826
     },
+    "tlt/cpi": {
+      "numerator": "tlt",
+      "denominator": "cpi",
+      "numerator_name": "TLT",
+      "denominator_name": "CPI",
+      "data_points": 278,
+      "start_date": "2002-07-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.006991547746975189,
+      "volatility_annual": 0.17611051094444483,
+      "residual_std": 0.17611051094444483,
+      "r_squared": 0.0658473523427216,
+      "initial_value": 0.4850534683149319
+    },
     "tlt/usd": {
       "numerator": "tlt",
       "denominator": "usd",
@@ -1704,6 +1858,174 @@
       "residual_std": 0.1561784941118941,
       "r_squared": 0.2762426746491093,
       "initial_value": 90.5939884934816
+    },
+    "cpi/btc": {
+      "numerator": "cpi",
+      "denominator": "btc",
+      "numerator_name": "CPI",
+      "denominator_name": "Bitcoin",
+      "data_points": 132,
+      "start_date": "2014-09-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.5285786614010065,
+      "volatility_annual": 0.6655163292307216,
+      "residual_std": 0.6655163292307216,
+      "r_squared": 0.8641395872883024,
+      "initial_value": 0.634990860167691
+    },
+    "cpi/sp500": {
+      "numerator": "cpi",
+      "denominator": "sp500",
+      "numerator_name": "CPI",
+      "denominator_name": "S&P 500",
+      "data_points": 571,
+      "start_date": "1957-01-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.031646626652707954,
+      "volatility_annual": 0.35975299572942815,
+      "residual_std": 0.35975299572942815,
+      "r_squared": 0.7507112023401119,
+      "initial_value": 0.8186839618124457
+    },
+    "cpi/nasdaq": {
+      "numerator": "cpi",
+      "denominator": "nasdaq",
+      "numerator_name": "CPI",
+      "denominator_name": "NASDAQ",
+      "data_points": 600,
+      "start_date": "1971-02-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.06467985979246556,
+      "volatility_annual": 0.3154719020377034,
+      "residual_std": 0.3154719020377034,
+      "r_squared": 0.905904205841297,
+      "initial_value": 0.8149046172856913
+    },
+    "cpi/vti": {
+      "numerator": "cpi",
+      "denominator": "vti",
+      "numerator_name": "CPI",
+      "denominator_name": "VTI",
+      "data_points": 291,
+      "start_date": "2001-06-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.055813018175064046,
+      "volatility_annual": 0.1700196738296668,
+      "residual_std": 0.1700196738296668,
+      "r_squared": 0.8407885311906721,
+      "initial_value": 4.846832831023203
+    },
+    "cpi/eem": {
+      "numerator": "cpi",
+      "denominator": "eem",
+      "numerator_name": "CPI",
+      "denominator_name": "EEM",
+      "data_points": 269,
+      "start_date": "2003-04-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.00477175245334804,
+      "volatility_annual": 0.2380085858096355,
+      "residual_std": 0.2380085858096355,
+      "r_squared": 0.016553161116793835,
+      "initial_value": 6.842997893251284
+    },
+    "cpi/gold": {
+      "numerator": "cpi",
+      "denominator": "gold",
+      "numerator_name": "CPI",
+      "denominator_name": "Gold",
+      "data_points": 488,
+      "start_date": "1957-01-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.02387317135745536,
+      "volatility_annual": 0.4307664357167976,
+      "residual_std": 0.4307664357167976,
+      "r_squared": 0.5216891576533597,
+      "initial_value": 0.8626505510947265
+    },
+    "cpi/silver": {
+      "numerator": "cpi",
+      "denominator": "silver",
+      "numerator_name": "CPI",
+      "denominator_name": "Silver",
+      "data_points": 301,
+      "start_date": "2000-08-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.043946588509965655,
+      "volatility_annual": 0.3913375185316783,
+      "residual_std": 0.3913375185316783,
+      "r_squared": 0.39802224800525304,
+      "initial_value": 27.39511710767951
+    },
+    "cpi/palladium": {
+      "numerator": "cpi",
+      "denominator": "palladium",
+      "numerator_name": "CPI",
+      "denominator_name": "Palladium",
+      "data_points": 318,
+      "start_date": "1998-09-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.05077550193651632,
+      "volatility_annual": 0.45747716458251364,
+      "residual_std": 0.45747716458251364,
+      "r_squared": 0.43117420487131203,
+      "initial_value": 0.7266082046473294
+    },
+    "cpi/copper": {
+      "numerator": "cpi",
+      "denominator": "copper",
+      "numerator_name": "CPI",
+      "denominator_name": "Copper",
+      "data_points": 257,
+      "start_date": "2000-08-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.034650406017299185,
+      "volatility_annual": 0.38408722987421756,
+      "residual_std": 0.38408722987421756,
+      "r_squared": 0.29927856545069226,
+      "initial_value": 146.41161460661132
+    },
+    "cpi/oil": {
+      "numerator": "cpi",
+      "denominator": "oil",
+      "numerator_name": "CPI",
+      "denominator_name": "Oil",
+      "data_points": 515,
+      "start_date": "1961-08-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.014703436899403169,
+      "volatility_annual": 0.47925403281459594,
+      "residual_std": 0.47925403281459594,
+      "r_squared": 0.23832878510643568,
+      "initial_value": 9.022124845861237
+    },
+    "cpi/tlt": {
+      "numerator": "cpi",
+      "denominator": "tlt",
+      "numerator_name": "CPI",
+      "denominator_name": "TLT",
+      "data_points": 278,
+      "start_date": "2002-07-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.006991547746975188,
+      "volatility_annual": 0.17611051094444483,
+      "residual_std": 0.17611051094444483,
+      "r_squared": 0.06584735234272157,
+      "initial_value": 2.0616283880496398
+    },
+    "cpi/usd": {
+      "numerator": "cpi",
+      "denominator": "usd",
+      "numerator_name": "CPI",
+      "denominator_name": "USD",
+      "data_points": 824,
+      "start_date": "1957-01-01",
+      "end_date": "2025-08-01",
+      "drift_annual": 0.03868150017845626,
+      "volatility_annual": 0.17046539289670376,
+      "residual_std": 0.17046539289670376,
+      "r_squared": 0.9529018472859702,
+      "initial_value": 28.865531789356005
     },
     "usd/btc": {
       "numerator": "usd",
@@ -1858,6 +2180,20 @@
       "residual_std": 0.1561784941118941,
       "r_squared": 0.276242674649109,
       "initial_value": 0.011038260006313243
+    },
+    "usd/cpi": {
+      "numerator": "usd",
+      "denominator": "cpi",
+      "numerator_name": "USD",
+      "denominator_name": "CPI",
+      "data_points": 824,
+      "start_date": "1957-01-01",
+      "end_date": "2025-08-01",
+      "drift_annual": -0.03868150017845626,
+      "volatility_annual": 0.17046539289670373,
+      "residual_std": 0.17046539289670373,
+      "r_squared": 0.9529018472859699,
+      "initial_value": 0.034643394318782106
     }
   }
 }
