@@ -164,7 +164,12 @@ def align_data(data1, data2):
 
 def fit_power_law(ratio_data, dates):
     """
-    Fit a power law (exponential) to ratio data.
+    Fit a power law (exponential) to ratio data with frequency-based weighting.
+
+    Weights are calculated based on the time interval each point represents:
+    - Points with daily spacing get lower weight per point
+    - Points with weekly/monthly spacing get higher weight per point
+    This ensures that all time periods contribute equally to the fit.
 
     Returns:
         dict with:
@@ -189,24 +194,61 @@ def fit_power_law(ratio_data, dates):
         for d in dates
     ])
 
+    # Calculate weights based on time gaps between points
+    # Each point's weight is proportional to the time interval it represents
+    weights = np.zeros(len(time_years))
+
+    for i in range(len(time_years)):
+        if i == 0:
+            # First point: use half the gap to next point
+            dt = time_years[1] - time_years[0] if len(time_years) > 1 else 1.0
+            weights[i] = dt / 2
+        elif i == len(time_years) - 1:
+            # Last point: use half the gap from previous point
+            dt = time_years[i] - time_years[i-1]
+            weights[i] = dt / 2
+        else:
+            # Middle points: use average of gaps on both sides
+            dt_before = time_years[i] - time_years[i-1]
+            dt_after = time_years[i+1] - time_years[i]
+            weights[i] = (dt_before + dt_after) / 2
+
+    # Normalize weights so they sum to the number of points
+    # This keeps the effective sample size similar to unweighted regression
+    weights = weights * len(weights) / np.sum(weights)
+
     # Take log of ratio data
     log_ratio = np.log(ratio_data)
 
-    # Fit linear regression: log(R) = a + b*t
+    # Perform weighted linear regression: log(R) = a + b*t
     # where b = μ (drift) and a = log(R(0))
-    slope, intercept, r_value, p_value, std_err = stats.linregress(time_years, log_ratio)
+    # Using numpy for weighted least squares
+    W = np.diag(weights)
+    X = np.column_stack([np.ones(len(time_years)), time_years])
 
-    # Calculate residuals for volatility estimation
+    # Weighted least squares: (X^T W X)^-1 X^T W y
+    XtWX = X.T @ W @ X
+    XtWy = X.T @ W @ log_ratio
+    params = np.linalg.solve(XtWX, XtWy)
+
+    intercept = params[0]
+    slope = params[1]
+
+    # Calculate fitted values and residuals
     fitted_log_ratio = intercept + slope * time_years
     residuals = log_ratio - fitted_log_ratio
 
-    # Calculate standard deviation of residuals (in log space)
-    # This is the typical deviation from the fitted power law
-    residual_std = np.std(residuals)
+    # Calculate weighted standard deviation of residuals
+    weighted_residual_var = np.sum(weights * residuals**2) / np.sum(weights)
+    residual_std = np.sqrt(weighted_residual_var)
 
-    # The residual_std is already the volatility we want
-    # It's the standard deviation of log returns around the trend
-    # No need to annualize since we're fitting against time in years
+    # Calculate R-squared for weighted regression
+    ss_res = np.sum(weights * residuals**2)
+    weighted_mean = np.sum(weights * log_ratio) / np.sum(weights)
+    ss_tot = np.sum(weights * (log_ratio - weighted_mean)**2)
+    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+
+    # The residual_std is the volatility (standard deviation around trend)
     sigma = residual_std
 
     # Growth rate is already annualized from regression
@@ -216,7 +258,7 @@ def fit_power_law(ratio_data, dates):
         'mu': float(mu),
         'sigma': float(sigma),
         'residual_std': float(residual_std),  # Standard deviation in log space
-        'r_squared': float(r_value ** 2),
+        'r_squared': float(r_squared),
         'initial_value': float(np.exp(intercept))
     }
 
