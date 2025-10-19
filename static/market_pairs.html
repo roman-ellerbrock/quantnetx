@@ -1684,30 +1684,55 @@
                 if (symbols[i] === 'btc') {
                     try {
                         const data = await loadMarketData(symbols[i]);
-                        if (data.close && data.close.length > 1) {
-                            const assetReturns = calculateReturns(data.close);
-                            let periodsPerYear = 252;
-                            if (data.timestamps && data.timestamps.length > 1) {
-                                // Timestamps are in Unix seconds, not milliseconds
-                                const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
-                                                       (data.timestamps.length - 1) / (60 * 60 * 24);
-                                if (avgDaysBetween > 25) {
-                                    periodsPerYear = 12;
-                                } else if (avgDaysBetween > 5) {
-                                    periodsPerYear = 52;
-                                }
+                        if (data.close && data.close.length > 1 && data.timestamps && data.timestamps.length > 1) {
+                            // Calculate actual CAGR from total return over time period
+                            const startPrice = data.close[0];
+                            const endPrice = data.close[data.close.length - 1];
+                            const startTime = data.timestamps[0];
+                            const endTime = data.timestamps[data.timestamps.length - 1];
+                            const years = (endTime - startTime) / (60 * 60 * 24 * 365.25);
+
+                            // CAGR = (endPrice / startPrice)^(1/years) - 1
+                            const annualizedReturn = (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100;
+
+                            // For volatility, calculate time-adjusted returns
+                            const timeAdjustedReturns = [];
+                            for (let j = 1; j < data.close.length; j++) {
+                                const rawReturn = (data.close[j] - data.close[j-1]) / data.close[j-1];
+                                const daysElapsed = (data.timestamps[j] - data.timestamps[j-1]) / (60 * 60 * 24);
+                                const dailyReturn = rawReturn / Math.sqrt(daysElapsed);
+                                timeAdjustedReturns.push(dailyReturn);
                             }
-                            const meanReturn = assetReturns.reduce((a, b) => a + b, 0) / assetReturns.length;
-                            const variance = assetReturns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / assetReturns.length;
-                            const stdDev = Math.sqrt(variance);
-                            const annualizedReturn = meanReturn * periodsPerYear * 100;
-                            const annualizedVolatility = stdDev * Math.sqrt(periodsPerYear) * 100;
+
+                            const meanReturn = timeAdjustedReturns.reduce((a, b) => a + b, 0) / timeAdjustedReturns.length;
+                            const variance = timeAdjustedReturns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / timeAdjustedReturns.length;
+                            const dailyStdDev = Math.sqrt(variance);
+
+                            const annualizedVolatility = dailyStdDev * Math.sqrt(252) * 100;
+
+                            // Calculate selected ratio using actual CAGR
+                            const actualAnnualReturn = annualizedReturn / 100;
+                            const actualAnnualVolatility = annualizedVolatility / 100;
+
                             let ratio;
                             if (metricType === 'sharpe') {
-                                ratio = calculateSharpeRatio(assetReturns, periodsPerYear);
+                                ratio = actualAnnualReturn / actualAnnualVolatility;
                             } else {
-                                ratio = calculateSortinoRatio(assetReturns, periodsPerYear);
+                                const downsideReturns = [];
+                                for (let j = 1; j < data.close.length; j++) {
+                                    const rawReturn = (data.close[j] - data.close[j-1]) / data.close[j-1];
+                                    if (rawReturn < 0) {
+                                        const daysElapsed = (data.timestamps[j] - data.timestamps[j-1]) / (60 * 60 * 24);
+                                        const dailyReturn = rawReturn / Math.sqrt(daysElapsed);
+                                        downsideReturns.push(dailyReturn);
+                                    }
+                                }
+                                const downsideVariance = downsideReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / timeAdjustedReturns.length;
+                                const downsideStdDev = Math.sqrt(downsideVariance);
+                                const annualizedDownsideVol = downsideStdDev * Math.sqrt(252);
+                                ratio = actualAnnualReturn / annualizedDownsideVol;
                             }
+
                             bitcoinStats = {
                                 return: annualizedReturn,
                                 volatility: annualizedVolatility,
@@ -1723,40 +1748,70 @@
                 try {
                     const data = await loadMarketData(symbols[i]);
 
-                    if (data.close && data.close.length > 1) {
-                        const assetReturns = calculateReturns(data.close);
+                    if (data.close && data.close.length > 1 && data.timestamps && data.timestamps.length > 1) {
+                        // Calculate actual CAGR from total return over time period
+                        const startPrice = data.close[0];
+                        const endPrice = data.close[data.close.length - 1];
+                        const startTime = data.timestamps[0];
+                        const endTime = data.timestamps[data.timestamps.length - 1];
+                        const years = (endTime - startTime) / (60 * 60 * 24 * 365.25);
 
-                        // Determine periods per year based on data frequency
-                        let periodsPerYear = 252; // Default to daily
-                        if (data.timestamps && data.timestamps.length > 1) {
-                            // Timestamps are in Unix seconds, not milliseconds
-                            const avgDaysBetween = (data.timestamps[data.timestamps.length - 1] - data.timestamps[0]) /
-                                                   (data.timestamps.length - 1) / (60 * 60 * 24);
-                            if (avgDaysBetween > 25) {
-                                periodsPerYear = 12; // Monthly data
-                            } else if (avgDaysBetween > 5) {
-                                periodsPerYear = 52; // Weekly data
-                            }
+                        // CAGR = (endPrice / startPrice)^(1/years) - 1
+                        const annualizedReturn = (Math.pow(endPrice / startPrice, 1 / years) - 1) * 100;
+
+                        // For volatility, calculate time-adjusted returns
+                        // For irregular data, we need to account for actual time gaps
+                        const timeAdjustedReturns = [];
+                        for (let j = 1; j < data.close.length; j++) {
+                            const rawReturn = (data.close[j] - data.close[j-1]) / data.close[j-1];
+                            const daysElapsed = (data.timestamps[j] - data.timestamps[j-1]) / (60 * 60 * 24);
+                            // Normalize to daily return equivalent
+                            const dailyReturn = rawReturn / Math.sqrt(daysElapsed);
+                            timeAdjustedReturns.push(dailyReturn);
                         }
 
-                        // Calculate mean and standard deviation
-                        const meanReturn = assetReturns.reduce((a, b) => a + b, 0) / assetReturns.length;
-                        const variance = assetReturns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / assetReturns.length;
-                        const stdDev = Math.sqrt(variance);
+                        const meanReturn = timeAdjustedReturns.reduce((a, b) => a + b, 0) / timeAdjustedReturns.length;
+                        const variance = timeAdjustedReturns.reduce((sum, r) => sum + Math.pow(r - meanReturn, 2), 0) / timeAdjustedReturns.length;
+                        const dailyStdDev = Math.sqrt(variance);
 
-                        // Annualize
-                        const annualizedReturn = meanReturn * periodsPerYear * 100; // Convert to percentage
-                        const annualizedVolatility = stdDev * Math.sqrt(periodsPerYear) * 100; // Convert to percentage
+                        // Annualize using 252 trading days
+                        const annualizedVolatility = dailyStdDev * Math.sqrt(252) * 100;
 
-                        // Calculate selected ratio
+                        // For ratios, use the original returns (not time-adjusted)
+                        const assetReturns = calculateReturns(data.close);
+                        const avgDaysBetween = (endTime - startTime) / (data.timestamps.length - 1) / (60 * 60 * 24);
+                        let periodsPerYear = 252;
+                        if (avgDaysBetween > 25) {
+                            periodsPerYear = 12;
+                        } else if (avgDaysBetween > 5) {
+                            periodsPerYear = 52;
+                        }
+
+                        // Calculate selected ratio using actual return CAGR (not mean*periods)
+                        const actualAnnualReturn = annualizedReturn / 100;  // Convert back to decimal
+                        const actualAnnualVolatility = annualizedVolatility / 100;
+
                         let ratio;
                         if (metricType === 'sharpe') {
-                            ratio = calculateSharpeRatio(assetReturns, periodsPerYear);
+                            ratio = actualAnnualReturn / actualAnnualVolatility;
                         } else {
-                            ratio = calculateSortinoRatio(assetReturns, periodsPerYear);
+                            // For Sortino, calculate downside deviation with time adjustment
+                            const downsideReturns = [];
+                            for (let j = 1; j < data.close.length; j++) {
+                                const rawReturn = (data.close[j] - data.close[j-1]) / data.close[j-1];
+                                if (rawReturn < 0) {
+                                    const daysElapsed = (data.timestamps[j] - data.timestamps[j-1]) / (60 * 60 * 24);
+                                    const dailyReturn = rawReturn / Math.sqrt(daysElapsed);
+                                    downsideReturns.push(dailyReturn);
+                                }
+                            }
+                            const downsideVariance = downsideReturns.reduce((sum, r) => sum + Math.pow(r, 2), 0) / timeAdjustedReturns.length;
+                            const downsideStdDev = Math.sqrt(downsideVariance);
+                            const annualizedDownsideVol = downsideStdDev * Math.sqrt(252);
+                            ratio = actualAnnualReturn / annualizedDownsideVol;
                         }
 
-                        if (!isNaN(annualizedReturn) && !isNaN(annualizedVolatility) && ratio !== null) {
+                        if (!isNaN(annualizedReturn) && !isNaN(annualizedVolatility) && ratio !== null && !isNaN(ratio)) {
                             returns.push(annualizedReturn);
                             volatilities.push(annualizedVolatility);
                             ratioValues.push(ratio);
@@ -2048,5 +2103,12 @@
         // Event listener for distribution asset selector
         document.getElementById('distributionAssetSelect').addEventListener('change', createReturnDistribution);
     </script>
+
+    <footer style="text-align: center; padding: 30px 20px; margin-top: 50px; border-top: 1px solid rgba(255, 255, 255, 0.1); color: #a0a0a0; font-size: 0.9em;">
+        <p><strong>Impressum</strong></p>
+        <p>Roman Ellerbrock</p>
+        <p><a href="https://github.com/roman-ellerbrock" target="_blank" rel="noopener noreferrer" style="color: #4a9eff; text-decoration: none;">github.com/roman-ellerbrock</a></p>
+        <p style="margin-top: 10px;">&copy; 2025 Roman Ellerbrock. All rights reserved.</p>
+    </footer>
 </body>
 </html>
