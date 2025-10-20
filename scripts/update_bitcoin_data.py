@@ -11,10 +11,12 @@ from datetime import datetime, timezone
 
 CSV_FILE = 'data/BTCUSD_1W.csv'
 WEEK_SECONDS = 7 * 24 * 3600  # 1 week in seconds
+MAX_RETRIES = 3  # Number of retries for API requests
+RETRY_DELAY = 2  # Seconds to wait between retries
 
 def fetch_binance_klines(start_time, end_time=None):
     """
-    Fetch weekly Bitcoin price data from Binance API.
+    Fetch weekly Bitcoin price data from Binance API with retry logic.
 
     Args:
         start_time: Unix timestamp in seconds
@@ -37,34 +39,47 @@ def fetch_binance_klines(start_time, end_time=None):
         'limit': 1000  # Max limit per request
     }
 
-    try:
-        print(f"Fetching data from Binance...")
-        print(f"  Start: {datetime.fromtimestamp(start_time, tz=timezone.utc)}")
-        print(f"  End:   {datetime.fromtimestamp(end_time if end_time else time.time(), tz=timezone.utc)}")
+    print(f"Fetching data from Binance...")
+    print(f"  Start: {datetime.fromtimestamp(start_time, tz=timezone.utc)}")
+    print(f"  End:   {datetime.fromtimestamp(end_time if end_time else time.time(), tz=timezone.utc)}")
 
-        response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
+    # Retry loop
+    for attempt in range(MAX_RETRIES):
+        try:
+            if attempt > 0:
+                print(f"  Retry attempt {attempt + 1}/{MAX_RETRIES}...")
+                time.sleep(RETRY_DELAY)
 
-        klines = response.json()
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
 
-        # Convert Binance format to our format
-        # Binance returns: [open_time, open, high, low, close, volume, ...]
-        data = []
-        for kline in klines:
-            timestamp = int(kline[0]) // 1000  # Convert ms to seconds
-            open_price = float(kline[1])
-            high_price = float(kline[2])
-            low_price = float(kline[3])
-            close_price = float(kline[4])
+            klines = response.json()
 
-            data.append([timestamp, open_price, high_price, low_price, close_price])
+            # Convert Binance format to our format
+            # Binance returns: [open_time, open, high, low, close, volume, ...]
+            data = []
+            for kline in klines:
+                timestamp = int(kline[0]) // 1000  # Convert ms to seconds
+                open_price = float(kline[1])
+                high_price = float(kline[2])
+                low_price = float(kline[3])
+                close_price = float(kline[4])
 
-        print(f"Fetched {len(data)} candles from Binance")
-        return data
+                data.append([timestamp, open_price, high_price, low_price, close_price])
 
-    except requests.RequestException as e:
-        print(f"Error fetching data from Binance: {e}")
-        return []
+            print(f"Fetched {len(data)} candles from Binance")
+            return data
+
+        except requests.RequestException as e:
+            print(f"Error fetching data from Binance (attempt {attempt + 1}/{MAX_RETRIES}): {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"  Status code: {e.response.status_code}")
+                print(f"  Response body: {e.response.text}")
+
+            # If this was the last attempt, return empty list
+            if attempt == MAX_RETRIES - 1:
+                print("All retry attempts exhausted")
+                return []
 
 def get_last_timestamp(csv_file):
     """Get the last timestamp from the CSV file."""
