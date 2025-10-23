@@ -30,8 +30,10 @@
             The chart shows the ratio of the first asset divided by the second asset over time.
             The page automatically uses the longest available historical data (monthly data for SP500 since 1935, Gold since 1935, Oil since 1961).
             <br><br>
-            <strong>Power Law Model:</strong> R(t) = R(0) · exp(μ·t), where μ is the exponential growth rate (annualized).
-            The dashed orange line shows the fitted exponential trend with ±1σ parallel bands.
+            <strong>Power Law Models:</strong> Two models are used depending on the asset:
+            <br>• <em>Exponential Model:</em> R(t) = R(0) · exp(μ·t), where μ is the exponential growth rate (annualized). Used for most traditional assets.
+            <br>• <em>Bitcoin Power Law:</em> R(t) = R(0) · exp(a·log(t-t₀)+b), where t₀ is the origin time, and a, b are fitted parameters capturing the logarithmic growth dynamics specific to Bitcoin's adoption curve.
+            <br>The dashed orange line shows the fitted trend with ±1σ parallel bands.
             <br><br>
             <strong>Risk Color Coding:</strong> The price markers are colored based on deviation from the power law trend.
             Green = undervalued (below trend), Blue = fair value (near trend), Orange/Red = overvalued (above trend).
