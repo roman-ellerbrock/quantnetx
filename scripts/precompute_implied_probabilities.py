@@ -26,15 +26,22 @@ DEFAULT_METHOD = 'finite-diff'  # or 'cubic-spline'
 def parse_expiry_to_timestamp(expiry_str: str) -> Optional[int]:
     """
     Parse expiry date string to timestamp.
-    Format: DDMMMYY (e.g., "14OCT25")
+    Format: DDMMMYY (e.g., "14OCT25") or DMMMYY (e.g., "6FEB26")
 
     Returns:
         Unix timestamp in milliseconds, or None if parsing fails
     """
     try:
-        day = int(expiry_str[0:2])
-        month_str = expiry_str[2:5].upper()
-        year = 2000 + int(expiry_str[5:7])
+        # Find where the month abbreviation starts (first alpha char)
+        month_start = 0
+        for i, c in enumerate(expiry_str):
+            if c.isalpha():
+                month_start = i
+                break
+
+        day = int(expiry_str[:month_start])
+        month_str = expiry_str[month_start:month_start + 3].upper()
+        year = 2000 + int(expiry_str[month_start + 3:month_start + 5])
 
         months = {
             'JAN': 1, 'FEB': 2, 'MAR': 3, 'APR': 4, 'MAY': 5, 'JUN': 6,
